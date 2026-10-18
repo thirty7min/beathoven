@@ -11,6 +11,7 @@ import {
   DEFAULT_SETTINGS,
   LISTEN_OPTIONS_SECONDS,
   MODES,
+  PLAYABLE_MODES,
   PREMADE_UPLOAD_SECONDS,
   PRODUCE_OPTIONS_SECONDS,
   SETTINGS_LIMITS,
@@ -32,9 +33,9 @@ export type RoomSettingsDraft = {
   revealNames: boolean;
 };
 
-export const DEFAULT_DRAFT: RoomSettingsDraft = { mode: "classic", name: "", genre: DEFAULT_GENRE, ...DEFAULT_SETTINGS, revealNames: false };
+export const DEFAULT_DRAFT: RoomSettingsDraft = { mode: PLAYABLE_MODES[0].id, name: "", genre: DEFAULT_GENRE, ...DEFAULT_SETTINGS, revealNames: false };
 
-const MODE_OPTIONS = MODES.map((m) => ({ value: m.id, label: m.name, description: m.blurb, icon: <ModeIcon mode={m.id} /> }));
+const MODE_OPTIONS = PLAYABLE_MODES.map((m) => ({ value: m.id, label: m.name, description: m.blurb, icon: <ModeIcon mode={m.id} /> }));
 const GENRE_OPTIONS = GENRES.map((g) => ({ value: g.slug as Genre, label: g.label }));
 const LISTEN_LABEL = "Listen time per track";
 const NAMES_HINT = "Shown: everyone sees who made the track that's playing. Hidden: names appear in the results.";

@@ -1,4 +1,5 @@
 import type { RoomMode } from "./types";
+import { CLASSIC_MODE_ENABLED } from "@/lib/features";
 
 // Must match the check constraints on public.rooms.
 export const SETTINGS_LIMITS = {
@@ -29,6 +30,8 @@ export const MODES: { id: RoomMode; name: string; blurb: string }[] = [
   { id: "creative", name: "Creative", blurb: "Get a random prompt, then make anything that fits. No other rules." },
   { id: "premade", name: "Premade", blurb: "Upload a finished track. 3 minutes to upload, no production." },
 ];
+
+export const PLAYABLE_MODES = MODES.filter((m) => m.id !== "classic" || CLASSIC_MODE_ENABLED);
 
 export function modeName(mode: RoomMode): string {
   return MODES.find((m) => m.id === mode)?.name ?? mode;

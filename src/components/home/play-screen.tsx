@@ -15,8 +15,9 @@ import { TabPanels, Tabs } from "@/components/ui/tabs";
 import { useCurrentRoom } from "@/hooks/use-current-room";
 import { useOnHide } from "@/hooks/use-on-hide";
 import { usePublicRooms } from "@/hooks/use-public-rooms";
+import { QUEUE_ENABLED } from "@/lib/features";
 import { quickMatch } from "@/lib/game/rpc";
-import { MODES } from "@/lib/game/room-settings";
+import { PLAYABLE_MODES } from "@/lib/game/room-settings";
 import type { RoomMode } from "@/lib/game/types";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { EmptyState, LobbyListSkeleton, RoomSections } from "./lobby-list";
@@ -40,6 +41,8 @@ export function PlayScreen() {
       </Card>
     );
   }
+
+  if (!QUEUE_ENABLED) return <LobbiesPanel />;
 
   return (
     <div className="flex flex-col gap-8">
@@ -69,14 +72,14 @@ function LobbiesPanel() {
   const { rooms, error } = usePublicRooms(true);
 
   if (rooms === null) return error ? <EmptyState>Couldn&apos;t load lobbies. Retrying…</EmptyState> : <LobbyListSkeleton rows={4} />;
-  return <RoomSections rooms={rooms} emptyOpen="No open lobbies right now. Create one or try the queue." />;
+  return <RoomSections rooms={rooms} emptyOpen={QUEUE_ENABLED ? "No open lobbies right now. Create one or try the queue." : "No open lobbies right now. Create one."} />;
 }
 
 function QueuePanel() {
   const router = useRouter();
   const { user } = useAuth();
   const { room: currentRoom } = useCurrentRoom(user?.id ?? null);
-  const [mode, setMode] = useState<RoomMode>("classic");
+  const [mode, setMode] = useState<RoomMode>(PLAYABLE_MODES[0].id);
   const [finding, setFinding] = useState(false);
   const [confirming, setConfirming] = useState(false);
   useOnHide(() => {
@@ -100,7 +103,7 @@ function QueuePanel() {
     <div className="flex max-w-3xl flex-col gap-6">
       <p className="text-sm text-muted">Pick a mode and we&apos;ll drop you into an open lobby, or start one if none are waiting.</p>
       <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Mode">
-        {MODES.map((m) => (
+        {PLAYABLE_MODES.map((m) => (
           <Tooltip key={m.id} focusable={false} content={<ModeTooltipContent room={{ mode: m.id }} />} className="flex">
             <SelectCard
               selected={mode === m.id}

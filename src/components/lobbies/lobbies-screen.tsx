@@ -12,7 +12,7 @@ import { SearchInput } from "@/components/ui/field";
 import { Pill } from "@/components/ui/pill";
 import { SelectCard } from "@/components/ui/select-card";
 import { usePublicRooms } from "@/hooks/use-public-rooms";
-import { MODES } from "@/lib/game/room-settings";
+import { PLAYABLE_MODES } from "@/lib/game/room-settings";
 import type { RoomMode } from "@/lib/game/types";
 
 export function LobbiesScreen() {
@@ -46,9 +46,9 @@ export function LobbiesScreen() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={PLAYABLE_MODES.length === 3 ? "grid grid-cols-2 gap-3 lg:grid-cols-4" : "grid grid-cols-3 gap-3"}>
         <SelectCard selected={mode === "all"} onSelect={() => setMode("all")} title="All" value={rooms ? countFor("all") : "–"} />
-        {MODES.map((m) => (
+        {PLAYABLE_MODES.map((m) => (
           <SelectCard
             key={m.id}
             selected={mode === m.id}
