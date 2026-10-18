@@ -39,6 +39,7 @@
   --animate-lick: lick 1s ease-in-out infinite;
   --animate-puff: puff 2.4s ease-in-out infinite;
   --animate-haze: haze 1.8s linear infinite;
+  --animate-shimmer: shimmer 2s linear infinite;
 
   @keyframes eq {
     0%, 100% { transform: scaleY(0.2); }
@@ -91,6 +92,10 @@
     7% { opacity: 1; }
     88% { opacity: 1; }
     100% { opacity: 0; }
+  }
+  @keyframes shimmer {
+    from { background-position: 100% 0; }
+    to { background-position: 0 0; }
   }
   @keyframes grain {
     0% { transform: translate(0, 0); }

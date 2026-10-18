@@ -149,8 +149,8 @@ void main() {
   for (int i = 0; i < ${SMOKE_PUFFS}; i++) {
     float fi = float(i);
     float life = fract(u_phase * 70.0 / ${PERIOD} + fi / ${glslFloat(SMOKE_PUFFS)});
-    vec2 center = vec2(sin(life * 4.0 + fi * 2.1) * 0.25, 0.9 + life * 2.0);
-    float radius = 0.22 + 0.35 * life;
+    vec2 center = vec2(sin(life * 4.0 + fi * 2.1) * 0.2, 0.9 + life * 1.4);
+    float radius = 0.18 + 0.25 * life;
     float puff = 1.0 - smoothstep(radius * 0.55, radius, length(p - center));
     smoke = max(smoke, puff * (1.0 - life) * smoothstep(0.0, 0.2, life));
   }

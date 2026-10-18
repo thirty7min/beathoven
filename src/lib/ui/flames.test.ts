@@ -42,7 +42,9 @@ describe("flameLevel", () => {
       expect(levels[i].fire).toBeGreaterThan(levels[i - 1].fire);
       expect(levels[i].embers).toBeGreaterThanOrEqual(levels[i - 1].embers);
     }
-    expect(levels[4]).toEqual({ fire: 1, smoke: 0, embers: 1 });
+    expect(levels[4]).toEqual({ fire: 0.42, smoke: 0, embers: 0.35 });
+    expect(levels[3].fire).toBeLessThan(levels[4].fire);
+    expect(levels[1].fire).toBeLessThan(levels[4].fire / 4);
   });
 
   it("clamps and rounds, and is cold without a score", () => {
@@ -93,7 +95,7 @@ describe("approach", () => {
     const current = { ...COLD };
     const result = approachLevel(current, flameLevel(5), FLAME_HALF_LIFE_MS);
     expect(result).toBe(current);
-    expect(current.fire).toBeCloseTo(0.5);
+    expect(current.fire).toBeCloseTo(flameLevel(5).fire / 2);
     for (let i = 0; i < 60; i++) approachLevel(current, flameLevel(5), 16);
     expect(current).toEqual(flameLevel(5));
   });
@@ -109,7 +111,7 @@ describe("flameShape", () => {
   });
 
   it("keeps the tallest, widest tongue inside the canvas so nothing clips", () => {
-    const reach = flameReach(shape(1));
+    const reach = flameReach(shape(flameLevel(5).fire));
     expect(reach.top).toBeLessThanOrEqual(FIRE_BOX.top - EDGE_FADE);
     expect(reach.side).toBeLessThanOrEqual(FIRE_BOX.right - EDGE_FADE);
     expect(reach.side).toBeLessThanOrEqual(-FIRE_BOX.left - EDGE_FADE);
@@ -124,14 +126,14 @@ describe("flameShape", () => {
   it("lights the badge with the fire and nothing when cold", () => {
     expect(shape(0)).toMatchObject({ glow: 0, rim: 0, front: 0, tint: 0 });
     expect(shape(1)).toMatchObject({ glow: 1, rim: 1, front: 1, tint: 1 });
-    const [two, three, four] = [2, 3, 4].map((score) => shape(flameLevel(score).fire));
+    const [two, three, four, five] = [2, 3, 4, 5].map((score) => shape(flameLevel(score).fire));
     expect(two.rim).toBeGreaterThan(0);
-    expect(two.front).toBe(0);
-    expect(three.front).toBeGreaterThan(0);
-    expect(three.front).toBeLessThan(0.5);
+    expect(four.front).toBe(0);
+    expect(five.front).toBeGreaterThan(0);
+    expect(five.front).toBeLessThan(0.1);
     expect(four.glow).toBeGreaterThan(three.glow);
-    expect(four.front).toBeGreaterThan(three.front);
-    expect(three.tint).toBeLessThan(three.glow);
+    expect(five.glow).toBeLessThan(0.5);
+    expect(five.tint).toBeLessThan(five.glow);
   });
 
   it("writes into the given object", () => {
@@ -159,7 +161,7 @@ describe("fire canvas", () => {
     const box = fireBoxStyle();
     expect(box.left).toBe(`${((FIRE_BOX.left + 1) / 2) * 100}%`);
     const [left, top, width, height] = [box.left, box.top, box.width, box.height].map(parseFloat);
-    const reach = flameReach(shape(1));
+    const reach = flameReach(shape(flameLevel(5).fire));
     expect(left + width).toBeCloseTo(100 - left);
     expect(-top).toBeGreaterThanOrEqual(((reach.top - 1) / 2) * 100);
     expect(-left).toBeGreaterThanOrEqual(((reach.side - 1) / 2) * 100);
@@ -173,8 +175,8 @@ describe("flat flame style", () => {
     expect(FLAME_BANDS).toHaveLength(FLAME_PALETTE.length);
     for (let i = 1; i < FLAME_BANDS.length; i++) expect(FLAME_BANDS[i]).toBeGreaterThan(FLAME_BANDS[i - 1]);
     expect(FLAME_BANDS[0]).toBeGreaterThan(0);
-    expect(FLAME_BANDS.at(-1)).toBeLessThan(rimHeat(1));
-    expect(FLAME_BANDS.at(-1)).toBeGreaterThan(rimHeat(flameLevel(2).fire));
+    expect(FLAME_BANDS.at(-1)).toBeLessThan(rimHeat(flameLevel(5).fire));
+    expect(FLAME_BANDS.at(-1)).toBeGreaterThan(rimHeat(flameLevel(4).fire));
   });
 
   it("turns hex colours into shader literals", () => {
@@ -187,7 +189,7 @@ describe("flat flame style", () => {
 
 describe("corona", () => {
   it("wraps the badge in a rounded burn instead of a single spire", () => {
-    const blaze = shape(1);
+    const blaze = shape(flameLevel(5).fire);
     const top = coronaLength(blaze, 1);
     const shoulder = coronaLength(blaze, Math.SQRT1_2);
     const side = coronaLength(blaze, 0);

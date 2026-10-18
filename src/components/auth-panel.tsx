@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { suggestUsername } from "@/lib/profile/validate";
 import { AuthError, useAuth, type OAuthProvider } from "./auth-provider";
 import { Button } from "./ui/button";
+import { LegalNotice } from "./legal/legal-notice";
 import { DiscordIcon, GoogleIcon } from "./ui/brand-icons";
 import { Input } from "./ui/field";
 import { notifyFailure } from "@/lib/ui/notify";
@@ -93,6 +94,8 @@ export function AuthPanel({ next, onDone }: { next?: string; onDone?: () => void
           Continue with Google
         </Button>
       </div>
+
+      <LegalNotice className="text-center" />
     </div>
   );
 }

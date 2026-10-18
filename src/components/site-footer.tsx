@@ -7,7 +7,8 @@ const LINKS = [
   { href: "/", label: "Home" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/about", label: "About" },
-  { href: "/legal", label: "Legal" },
+  { href: "/terms", label: "Terms" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export function SiteFooter() {

@@ -26,7 +26,7 @@ import {
 import { FIRE_CONTEXT, createFireRenderer, supportsFireShader, type FireFrame, type FireRenderer } from "./fire-gl";
 
 const BOX_STYLE = fireBoxStyle();
-const FULL_FLAME = flameShape(1);
+const FULL_FLAME = flameShape(flameLevel(5).fire);
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 function subscribeReducedMotion(onChange: () => void) {
@@ -260,8 +260,8 @@ function FireFallback({ level, still }: { level: FlameLevel; still: boolean }) {
         ))}
       </g>
       <g className="transition-opacity duration-300 ease-snappy" style={{ opacity: level.smoke }}>
-        <circle cx="0.15" cy="-1.5" r="0.35" fill={`url(#${id}-smoke)`} />
-        <circle cx="-0.1" cy="-2.2" r="0.5" fill={`url(#${id}-smoke)`} />
+        <circle cx="0.12" cy="-1.4" r="0.3" fill={`url(#${id}-smoke)`} />
+        <circle cx="-0.08" cy="-1.95" r="0.4" fill={`url(#${id}-smoke)`} />
       </g>
     </svg>
   );

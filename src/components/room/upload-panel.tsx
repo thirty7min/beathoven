@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type DragEvent } from "react"
 import { toast } from "sonner";
 import { cn } from "@/components/ui/cn";
 import { ProgressBar } from "@/components/ui/progress";
+import { ShimmerText } from "@/components/ui/shimmer-text";
 import { AUDIO_ACCEPT, MAX_SUBMISSION_BYTES, MAX_TRACK_MS, MIN_TRACK_MS, formatBytes, validateAudioFile, validateDuration } from "@/lib/game/audio-file";
 import { formatClock } from "@/lib/game/format";
 import { readAudioDuration } from "@/lib/game/storage";
@@ -163,7 +164,7 @@ export function UploadPanel({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-semibold">{upload.name}</p>
-              <p className="text-[13px] text-muted">{upload.progress >= 1 ? "Checking file…" : "Uploading…"}</p>
+              <ShimmerText className="block w-fit text-[13px]">{upload.progress >= 1 ? "Checking file" : "Uploading"}</ShimmerText>
             </div>
             {upload.progress < 1 && <span className="text-xs text-muted tabular-nums">{Math.round(upload.progress * 100)}%</span>}
           </div>
@@ -181,7 +182,11 @@ export function UploadPanel({
           )}
         >
           <Plus className="h-6 w-6 stroke-[1.5] text-muted" />
-          <span className="text-[15px] font-semibold">{reading ? "Reading file…" : "Upload or drop your track"}</span>
+          {reading ? (
+            <ShimmerText className="text-[15px] font-semibold">Reading file</ShimmerText>
+          ) : (
+            <span className="text-[15px] font-semibold">Upload or drop your track</span>
+          )}
           <span className="text-[13px] text-muted">
             MP3, WAV, FLAC, OGG/Opus or M4A/AAC · up to {formatBytes(MAX_SUBMISSION_BYTES)} · {MIN_TRACK_MS / 1000} s to {MAX_TRACK_MS / 60_000} min
           </span>

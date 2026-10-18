@@ -14,14 +14,14 @@ export type FlameShape = {
 export const COLD: FlameLevel = { fire: 0, smoke: 0, embers: 0 };
 
 const LEVELS: Record<number, FlameLevel> = {
-  1: { fire: 0, smoke: 0.55, embers: 0 },
-  2: { fire: 0.14, smoke: 0.8, embers: 0.25 },
-  3: { fire: 0.42, smoke: 0, embers: 0.35 },
-  4: { fire: 0.7, smoke: 0, embers: 0.65 },
-  5: { fire: 1, smoke: 0, embers: 1 },
+  1: { fire: 0, smoke: 0.35, embers: 0 },
+  2: { fire: 0.06, smoke: 0.5, embers: 0.09 },
+  3: { fire: 0.18, smoke: 0, embers: 0.15 },
+  4: { fire: 0.29, smoke: 0, embers: 0.24 },
+  5: { fire: 0.42, smoke: 0, embers: 0.35 },
 };
 
-export const FIRE_BOX = { left: -3.1, right: 3.1, bottom: -1.2, top: 4 };
+export const FIRE_BOX = { left: -2.3, right: 2.3, bottom: -1.2, top: 3 };
 export const EDGE_FADE = 0.3;
 export const BADGE_BORDER_PX = 1.5;
 export const EDGE_AA_PX = 1.5;

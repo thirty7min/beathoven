@@ -7,7 +7,8 @@ import { toast } from "sonner";
 import { AuthPanel } from "@/components/auth-panel";
 import { useAuth } from "@/components/auth-provider";
 import { Button, buttonClasses } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, Eyebrow } from "@/components/ui/card";
+import { cn } from "@/components/ui/cn";
 import { useCurrentRoom } from "@/hooks/use-current-room";
 import { useVisit } from "@/hooks/use-on-hide";
 import { useRoom } from "@/hooks/use-room";
@@ -17,6 +18,7 @@ import { joinGateView } from "@/lib/game/join-gate";
 import { isRemovedError, wasRemoved } from "@/lib/game/kick";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { isRoomCode } from "@/lib/game/room-settings";
+import { QUICK_REACTIONS } from "./chat-panel";
 import { ReconnectingNotice } from "./connection-badge";
 import { GameShell } from "./game-shell";
 import { ListeningView } from "./listening-view";
@@ -172,12 +174,65 @@ function Notice({ title, body, children }: { title: string; body: string; childr
 
 export function RoomSkeleton({ label = "Loading room…" }: { label?: string }) {
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]" aria-busy="true" aria-label={label}>
-      <div className="flex flex-col gap-6">
-        <div className="h-64 animate-pulse rounded-2xl border border-line bg-surface" />
-        <div className="h-80 animate-pulse rounded-2xl border border-line bg-surface" />
+    <div className="flex flex-col gap-4" aria-busy="true" aria-label={label}>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Bone className="h-7 w-44" />
+          <Bone className="h-5 w-20 rounded-md" />
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Bone className="h-9 w-28 rounded-lg" />
+          <Bone className="h-9 w-9 rounded-full sm:w-24" />
+          <Bone className="h-9 w-9 rounded-full" />
+        </div>
       </div>
-      <div className="hidden h-[32rem] animate-pulse rounded-2xl border border-line bg-surface lg:block" />
+
+      <div className="grid gap-4 lg:h-[calc(100dvh-11rem)] lg:min-h-[28rem] lg:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className="flex min-h-[22rem] flex-col lg:min-h-0">
+          <div className="flex items-center justify-between px-5 pt-4 pb-1">
+            <Eyebrow>Members</Eyebrow>
+            <Bone className="h-3 w-8" />
+          </div>
+          <div className="flex-1 divide-y divide-line px-5">
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="flex items-center gap-3.5 py-2.5">
+                <Bone className="h-10 w-10 rounded-full" />
+                <Bone className="h-3.5 w-32" />
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 border-t border-line p-4">
+            <div className="flex gap-3">
+              <Bone className="h-12 w-12 rounded-full sm:w-36" />
+              <Bone className="h-12 flex-1 rounded-full" />
+            </div>
+            <Bone className="h-3 w-16 self-end" />
+          </div>
+        </Card>
+
+        <Card className="flex h-[28rem] flex-col overflow-hidden lg:h-auto">
+          <div className="flex items-center justify-between px-5 pt-4 pb-1">
+            <Eyebrow>Chat</Eyebrow>
+            <Bone className="h-6 w-6 rounded-full" />
+          </div>
+          <div className="flex-1" />
+          <div className="flex flex-col gap-2.5 border-t border-line p-3">
+            <div className="flex items-center gap-2">
+              <Bone className="h-10 flex-1 rounded-full" />
+              <Bone className="h-10 w-20 rounded-full" />
+            </div>
+            <div className="flex gap-1.5">
+              {QUICK_REACTIONS.map((emoji) => (
+                <Bone key={emoji} className="h-9 flex-1 rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </Card>
+      </div>
     </div>
   );
+}
+
+function Bone({ className }: { className: string }) {
+  return <span className={cn("block animate-pulse rounded bg-raised", className)} />;
 }

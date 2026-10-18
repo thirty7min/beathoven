@@ -4,6 +4,7 @@ import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useAuth, type Profile } from "@/components/auth-provider";
+import { LegalNotice } from "@/components/legal/legal-notice";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/cn";
@@ -176,6 +177,8 @@ function OnboardingDialog({ profile, metadata, email }: { profile: Profile; meta
             {error}
           </p>
         )}
+
+        <LegalNotice />
 
         <div className="flex items-center justify-between gap-3">
           <Button variant="ghost" onClick={() => void signOut()} disabled={saving !== null}>

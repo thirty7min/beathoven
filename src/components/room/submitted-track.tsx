@@ -4,6 +4,7 @@ import { CheckCircle2, Lock, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ProgressBar } from "@/components/ui/progress";
+import { ShimmerText } from "@/components/ui/shimmer-text";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useWaveform } from "@/hooks/use-waveform";
 import { SUBMISSIONS_BUCKET } from "@/lib/game/storage";
@@ -148,7 +149,7 @@ export function SubmittedTrack({
       {replacing && (
         <div className="flex animate-drop-in flex-col gap-2 border-t border-line pt-4">
           <div className="flex items-center justify-between gap-4 text-xs text-muted">
-            <span className="truncate">{replacing.progress >= 1 ? "Checking file…" : `Replacing with ${replacing.name}`}</span>
+            <ShimmerText className="truncate">{replacing.progress >= 1 ? "Checking file" : `Replacing with ${replacing.name}`}</ShimmerText>
             {replacing.progress < 1 && <span className="tabular-nums">{Math.round(replacing.progress * 100)}%</span>}
           </div>
           <ProgressBar value={replacing.progress} />
