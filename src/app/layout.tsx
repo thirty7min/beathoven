@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <div className="flex flex-1 flex-col">{children}</div>
           <SiteFooter />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );

@@ -4,6 +4,10 @@ Notable changes to Beathoven. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Added
+
+- Cookie-free page view analytics, noted in the Privacy Policy.
+
 ### Changed
 
 - Guests now pick a display name, and get a random username automatically.

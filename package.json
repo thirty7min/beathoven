@@ -15,6 +15,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
+    "@vercel/analytics": "^2.0.1",
     "@wasm-audio-decoders/aac": "0.0.1",
     "@wasm-audio-decoders/flac": "0.2.11",
     "@wasm-audio-decoders/ogg-vorbis": "0.1.20",

@@ -30,7 +30,7 @@ export default function PrivacyPage() {
             Uploaded audio is deleted {SUBMISSION_RETENTION_DAYS} days after its room closes, except the latest version of each track on
             your profile.
           </li>
-          <li>We don&apos;t run analytics or ad trackers, and we don&apos;t sell your data.</li>
+          <li>We count page views with privacy-friendly, cookie-free analytics. We don&apos;t run ad trackers, and we don&apos;t sell your data.</li>
           <li>
             Email <ContactEmail /> to see, fix or delete your data.
           </li>
@@ -147,13 +147,13 @@ export default function PrivacyPage() {
             <Term>Supabase</Term> for the database, sign-in, file storage and realtime updates.
           </li>
           <li>
-            <Term>Vercel</Term> for hosting the site, running our server code and scheduled cleanup jobs.
+            <Term>Vercel</Term> for hosting the site, running our server code and scheduled cleanup jobs, and counting page views with Vercel Web Analytics. It doesn&apos;t use cookies and doesn&apos;t identify you across sites; it records the page, referrer, browser, device type and country, and discards your IP address.
           </li>
           <li>
             <Term>Google</Term> for Google sign-in and, when enabled, Safe Browsing link checks.
           </li>
         </LegalList>
-        <p>We don&apos;t use analytics, advertising or social media trackers.</p>
+        <p>We don&apos;t use advertising or social media trackers.</p>
       </LegalSection>
 
       <LegalSection title="Cookies and local storage">
