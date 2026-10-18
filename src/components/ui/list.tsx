@@ -4,6 +4,7 @@ import { createContext, use, type CSSProperties, type HTMLAttributes, type React
 import { cellClass, columnTemplates, type ListColumn } from "@/lib/ui/list-columns";
 import { cn } from "./cn";
 import { Eyebrow } from "./card";
+import { SkeletonGroup, SkeletonText } from "./skeleton";
 
 const ColumnsContext = createContext<ListColumn[] | null>(null);
 
@@ -92,5 +93,43 @@ export function Thumb({ children, className }: { children: ReactNode; className?
     <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-raised text-muted", className)}>
       {children}
     </span>
+  );
+}
+
+const SKELETON_TITLE_WIDTHS = ["w-40", "w-32", "w-48", "w-36", "w-28", "w-44"];
+
+export function ListTableSkeleton({
+  columns,
+  rows,
+  thumb,
+  subtitle,
+  cellWidths = [],
+  label = "Loading",
+}: {
+  columns: ListColumn[];
+  rows: number;
+  thumb?: ReactNode;
+  subtitle?: ReactNode;
+  cellWidths?: string[];
+  label?: string;
+}) {
+  return (
+    <SkeletonGroup label={label}>
+      <ListTable columns={columns}>
+        {Array.from({ length: rows }, (_, i) => (
+          <ListRow
+            key={i}
+            thumb={thumb}
+            title={<SkeletonText className={SKELETON_TITLE_WIDTHS[i % SKELETON_TITLE_WIDTHS.length]} />}
+            subtitle={subtitle}
+            cells={columns
+              .slice(1)
+              .map((column, c) =>
+                column.label ? <SkeletonText key={c} className={cn(cellWidths[c] ?? "w-8", column.align === "end" && "ml-auto", column.align === "center" && "mx-auto")} /> : null,
+              )}
+          />
+        ))}
+      </ListTable>
+    </SkeletonGroup>
   );
 }

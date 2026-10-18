@@ -2,13 +2,14 @@
 
 import { GitMerge, Pause, Pencil, Play, Split } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { EmptyState, LobbyListSkeleton } from "@/components/home/lobby-list";
+import { EmptyState } from "@/components/home/lobby-list";
 import { SeekableWaveform } from "@/components/room/waveform";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/cn";
 import { Eyebrow } from "@/components/ui/card";
 import { KebabMenu } from "@/components/ui/kebab-menu";
-import { ListRow, ListTable } from "@/components/ui/list";
+import { ListRow, ListTable, ListTableSkeleton } from "@/components/ui/list";
+import { Skeleton, SkeletonText } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Select } from "@/components/ui/select";
 import { useHoverPreview } from "@/hooks/use-hover-preview";
@@ -52,7 +53,7 @@ export function TopTracks({ username, isOwner, visible = true }: { username: str
 
   if (!data) {
     if (state.status === "error") return <EmptyState>Couldn&apos;t load tracks. Check your connection and try again.</EmptyState>;
-    return <LobbyListSkeleton rows={3} />;
+    return <TopTracksSkeleton isOwner={isOwner} />;
   }
 
   return (
@@ -90,6 +91,35 @@ export function TopTracks({ username, isOwner, visible = true }: { username: str
         </>
       )}
       {isOwner && <TrackToolDialog tool={tool} tracks={mine} onClose={() => setTool(null)} onChanged={reload} />}
+    </div>
+  );
+}
+
+function TopTracksSkeleton({ isOwner }: { isOwner: boolean }) {
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-xs text-muted">Sort by</span>
+        <Skeleton className="h-9 w-32 rounded-lg" />
+      </div>
+      <ListTableSkeleton
+        columns={isOwner ? OWNER_COLUMNS : COLUMNS}
+        rows={3}
+        label="Loading tracks"
+        thumb={<Skeleton className="h-10 w-10 rounded-full" />}
+        subtitle={
+          <span className="mt-1 flex min-w-0 items-center gap-3">
+            <span className="flex h-6 w-40 shrink-0 items-center sm:w-64">
+              <Skeleton className="h-4 w-full rounded" />
+            </span>
+            <SkeletonText className="w-8" />
+            <span className="hidden sm:block">
+              <SkeletonText className="w-32" />
+            </span>
+          </span>
+        }
+        cellWidths={["w-5", "w-5", "w-9", "w-8", "w-7"]}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Eyebrow } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { KebabMenu } from "@/components/ui/kebab-menu";
 import { List, Thumb } from "@/components/ui/list";
+import { Skeleton, SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
 import { useServerNow } from "@/hooks/use-server-now";
 import { ServerClock } from "@/lib/game/clock";
 import { etaLabel, phaseStatusLine, roomTitle, splitRooms } from "@/lib/game/room-list";
@@ -122,19 +123,35 @@ function copyText(text: string, message: string) {
   );
 }
 
+const TITLE_WIDTHS = ["w-44", "w-36", "w-52", "w-40", "w-32"];
+const HOST_WIDTHS = ["w-24", "w-28", "w-20", "w-32", "w-24"];
+
 export function LobbyListSkeleton({ rows = 3 }: { rows?: number }) {
   return (
-    <div className="flex flex-col divide-y divide-line">
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="flex items-center gap-3.5 px-2 py-3">
-          <span className="h-12 w-12 animate-pulse rounded-md bg-raised" />
-          <span className="flex flex-col gap-2">
-            <span className="h-3.5 w-40 animate-pulse rounded bg-raised" />
-            <span className="h-3 w-20 animate-pulse rounded bg-raised" />
-          </span>
-        </div>
-      ))}
-    </div>
+    <SkeletonGroup label="Loading lobbies" className="flex flex-col gap-1">
+      <div className="flex items-center gap-2 border-b border-line px-2 pb-2.5">
+        <Eyebrow>Open</Eyebrow>
+        <SkeletonText className="w-3 text-[11px]" />
+      </div>
+      <List>
+        {Array.from({ length: rows }, (_, i) => (
+          <li key={i} className="flex items-center gap-1">
+            <span className="flex min-w-0 flex-1 items-center gap-3.5 px-2 py-3">
+              <Skeleton className="h-12 w-12 rounded-md" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <SkeletonText className={cn("text-[15px]", TITLE_WIDTHS[i % TITLE_WIDTHS.length])} />
+                <span className="flex items-center gap-2 text-[13px]">
+                  <SkeletonText className={HOST_WIDTHS[i % HOST_WIDTHS.length]} />
+                  <Skeleton className="h-[22px] w-16 rounded-md" />
+                </span>
+              </span>
+              <SkeletonText className="w-16 shrink-0 text-sm" />
+            </span>
+            <span className="h-8 w-8 shrink-0" />
+          </li>
+        ))}
+      </List>
+    </SkeletonGroup>
   );
 }
 

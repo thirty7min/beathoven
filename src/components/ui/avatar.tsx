@@ -9,7 +9,9 @@ function hash(value: string): number {
   return Math.abs(h);
 }
 
-const SIZES = { xs: 24, sm: 32, md: 40, lg: 48, editor: 72, xl: 96, fluid: 96 } as const;
+export const AVATAR_SIZES = { xs: 24, sm: 32, md: 40, lg: 48, editor: 72, xl: 96, fluid: 96 } as const;
+
+export type AvatarSize = keyof typeof AVATAR_SIZES;
 
 export function Avatar({
   name,
@@ -21,10 +23,10 @@ export function Avatar({
   name: string;
   url?: string | null;
   seed?: string;
-  size?: keyof typeof SIZES;
+  size?: AvatarSize;
   className?: string;
 }) {
-  const px = SIZES[size];
+  const px = AVATAR_SIZES[size];
   const fluid = size === "fluid";
   const box = fluid ? undefined : { width: px, height: px };
   const base = cn("relative inline-flex shrink-0 overflow-hidden rounded-full", className);

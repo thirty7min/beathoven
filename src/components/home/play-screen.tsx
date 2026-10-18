@@ -11,7 +11,7 @@ import { ModeTooltipContent } from "@/components/mode-badge";
 import { SelectCard } from "@/components/ui/select-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
-import { TabPanels, Tabs } from "@/components/ui/tabs";
+import { TabPanels, Tabs, type TabItem } from "@/components/ui/tabs";
 import { useCurrentRoom } from "@/hooks/use-current-room";
 import { useOnHide } from "@/hooks/use-on-hide";
 import { usePublicRooms } from "@/hooks/use-public-rooms";
@@ -26,12 +26,25 @@ import { notifyError } from "@/lib/ui/notify";
 
 type View = "lobbies" | "queue";
 
+const VIEW_TABS: TabItem<View>[] = [
+  { id: "lobbies", label: "Lobbies" },
+  { id: "queue", label: "Queue" },
+];
+
 export function PlayScreen() {
   const { status } = useAuth();
   const [view, setView] = useState<View>("lobbies");
   const tabIds = useId();
 
-  if (status === "loading") return <div className="h-96 animate-pulse rounded-2xl bg-surface" />;
+  if (status === "loading") {
+    if (!QUEUE_ENABLED) return <LobbyListSkeleton rows={4} />;
+    return (
+      <div className="flex flex-col gap-8">
+        <Tabs label="Play mode" items={VIEW_TABS} active="lobbies" />
+        <LobbyListSkeleton rows={4} />
+      </div>
+    );
+  }
   if (status !== "signed_in") {
     return (
       <Card className="max-w-xl p-6 sm:p-8">
@@ -48,10 +61,7 @@ export function PlayScreen() {
     <div className="flex flex-col gap-8">
       <Tabs
         label="Play mode"
-        items={[
-          { id: "lobbies", label: "Lobbies" },
-          { id: "queue", label: "Queue" },
-        ]}
+        items={VIEW_TABS}
         active={view}
         onChange={setView}
         ids={tabIds}

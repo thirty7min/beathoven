@@ -11,6 +11,7 @@ import { cn } from "@/components/ui/cn";
 import { SearchInput } from "@/components/ui/field";
 import { Pill } from "@/components/ui/pill";
 import { SelectCard } from "@/components/ui/select-card";
+import { SkeletonText } from "@/components/ui/skeleton";
 import { usePublicRooms } from "@/hooks/use-public-rooms";
 import { PLAYABLE_MODES } from "@/lib/game/room-settings";
 import type { RoomMode } from "@/lib/game/types";
@@ -23,8 +24,7 @@ export function LobbiesScreen() {
   const [query, setQuery] = useState("");
   const [hasSpace, setHasSpace] = useState(false);
 
-  if (status === "loading") return <div className="h-96 animate-pulse rounded-2xl bg-surface" />;
-  if (!signedIn) {
+  if (status === "signed_out") {
     return (
       <Card className="max-w-xl p-6 sm:p-8">
         <h2 className="text-xl font-bold">Sign in to browse lobbies</h2>
@@ -43,11 +43,12 @@ export function LobbiesScreen() {
       (!needle || [r.code, r.host_username, r.host_display_name, r.name].some((v) => (v ?? "").toLowerCase().includes(needle))),
   );
   const countFor = (m: RoomMode | "all") => all.filter((r) => m === "all" || r.mode === m).length;
+  const countPlaceholder = error ? "–" : <SkeletonText className="w-6" />;
 
   return (
     <div className="flex flex-col gap-8">
       <div className={PLAYABLE_MODES.length === 3 ? "grid grid-cols-2 gap-3 lg:grid-cols-4" : "grid grid-cols-3 gap-3"}>
-        <SelectCard selected={mode === "all"} onSelect={() => setMode("all")} title="All" value={rooms ? countFor("all") : "–"} />
+        <SelectCard selected={mode === "all"} onSelect={() => setMode("all")} title="All" value={rooms ? countFor("all") : countPlaceholder} />
         {PLAYABLE_MODES.map((m) => (
           <SelectCard
             key={m.id}
@@ -55,7 +56,7 @@ export function LobbiesScreen() {
             onSelect={() => setMode(m.id)}
             icon={<ModeIcon mode={m.id} />}
             title={m.name}
-            value={rooms ? countFor(m.id) : "–"}
+            value={rooms ? countFor(m.id) : countPlaceholder}
           />
         ))}
       </div>
@@ -73,11 +74,16 @@ export function LobbiesScreen() {
           Has space
         </Pill>
         <div className="ml-auto flex items-center gap-3 text-sm">
-          <span className="font-semibold tabular-nums">
-            {visible.length} {visible.length === 1 ? "room" : "rooms"}
-          </span>
+          {rooms || error ? (
+            <span className="font-semibold tabular-nums">
+              {visible.length} {visible.length === 1 ? "room" : "rooms"}
+            </span>
+          ) : (
+            <SkeletonText className="w-14" />
+          )}
           <button
             onClick={() => void refresh()}
+            disabled={!signedIn}
             aria-label="Refresh lobbies"
             className="flex h-9 w-9 items-center justify-center rounded-full border border-line-strong text-muted transition hover:text-fg"
           >

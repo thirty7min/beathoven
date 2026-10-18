@@ -5,6 +5,7 @@ import { useRef, useState, type MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/cn";
 import { Dialog } from "@/components/ui/dialog";
+import { SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
 import { outboundLinkPath } from "@/lib/profile/link";
 import { checkProfileLink, type LinkCheck } from "@/lib/profile/link-check";
 import { linkHostname } from "@/lib/ui/profile-link";
@@ -91,10 +92,13 @@ export function ProfileLink({ username, linkUrl, className }: { username: string
 function LinkCheckBody({ check, username }: { check: Check; username: string }) {
   if (check.status === "loading") {
     return (
-      <div className="flex flex-col gap-4" aria-busy="true">
-        <p className="text-sm text-muted">Checking this link is safe…</p>
-        <div className="h-[74px] animate-pulse rounded-xl border border-line bg-raised" />
-      </div>
+      <SkeletonGroup label="Checking this link is safe" className="flex flex-col gap-4">
+        <SkeletonText className="w-4/5 text-sm" />
+        <div className="flex flex-col gap-1.5 rounded-xl border border-line px-4 py-3">
+          <SkeletonText className="w-40 text-xl" />
+          <SkeletonText className="w-64 text-xs" />
+        </div>
+      </SkeletonGroup>
     );
   }
   if (check.status === "ready") {

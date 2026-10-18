@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Profile } from "@/components/auth-provider";
-import { EmptyState, LobbyListSkeleton } from "@/components/home/lobby-list";
+import { EmptyState } from "@/components/home/lobby-list";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/components/ui/cn";
-import { ListRow, ListTable } from "@/components/ui/list";
+import { ListRow, ListTable, ListTableSkeleton } from "@/components/ui/list";
+import { SkeletonAvatar, SkeletonText } from "@/components/ui/skeleton";
 import { Tabs } from "@/components/ui/tabs";
 import { getBrowserClient } from "@/lib/supabase/client";
 import type { ListColumn } from "@/lib/ui/list-columns";
@@ -59,7 +60,25 @@ export function LeaderboardScreen() {
         onChange={setSort}
       />
       {rows === null ? (
-        data.error ? <EmptyState>Couldn&apos;t load the leaderboard.</EmptyState> : <LobbyListSkeleton rows={6} />
+        data.error ? (
+          <EmptyState>Couldn&apos;t load the leaderboard.</EmptyState>
+        ) : (
+          <ListTableSkeleton
+            columns={COLUMNS}
+            rows={8}
+            label="Loading the leaderboard"
+            thumb={
+              <>
+                <span className="w-6 shrink-0 text-sm">
+                  <SkeletonText className="ml-auto w-3" />
+                </span>
+                <SkeletonAvatar size="lg" />
+              </>
+            }
+            subtitle={<SkeletonText className="w-16" />}
+            cellWidths={["w-5", "w-5", "w-5"]}
+          />
+        )
       ) : rows.length === 0 ? (
         <EmptyState>No battles finished yet. Be the first on the board.</EmptyState>
       ) : (

@@ -4,15 +4,16 @@ import { CalendarDays, Pencil, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
-import { EmptyState, LobbyListSkeleton } from "@/components/home/lobby-list";
+import { EmptyState } from "@/components/home/lobby-list";
 import { ModeIcon } from "@/components/home/mode-icon";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ListRow, ListTable, Thumb } from "@/components/ui/list";
+import { ListRow, ListTable, ListTableSkeleton, Thumb } from "@/components/ui/list";
+import { Skeleton, SkeletonAvatar, SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
 import { StatStrip } from "@/components/ui/stat-strip";
-import { TabPanels, Tabs } from "@/components/ui/tabs";
+import { TabPanels, Tabs, type TabItem } from "@/components/ui/tabs";
 import { useProfile, type RoundHistoryItem } from "@/hooks/use-profile";
 import { formatScore } from "@/lib/game/format";
 import { modeName } from "@/lib/game/room-settings";
@@ -32,17 +33,22 @@ const COLUMNS: ListColumn[] = [
   { label: "Date", width: "7rem", align: "end", fromSm: true },
 ];
 
+type Section = "recent" | "tracks";
+
+const SECTION_TABS: TabItem<Section>[] = [
+  { id: "recent", label: "Recent battles" },
+  { id: "tracks", label: "Top tracks" },
+];
+
 export function ProfileScreen({ username }: { username: string }) {
   const { state, reload } = useProfile(username);
   const { user } = useAuth();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [section, setSection] = useState<"recent" | "tracks">("recent");
+  const [section, setSection] = useState<Section>("recent");
   const tabIds = useId();
 
-  if (state.status === "loading") {
-    return <div className="h-72 animate-pulse rounded-2xl border border-line bg-surface" />;
-  }
+  if (state.status === "loading") return <ProfileSkeleton />;
   if (state.status !== "ready") {
     return (
       <Card className="p-8">
@@ -110,10 +116,7 @@ export function ProfileScreen({ username }: { username: string }) {
       <section className="flex flex-col gap-5">
         <Tabs
           label="Profile sections"
-          items={[
-            { id: "recent", label: "Recent battles" },
-            { id: "tracks", label: "Top tracks" },
-          ]}
+          items={SECTION_TABS}
           active={section}
           onChange={setSection}
           ids={tabIds}
@@ -126,7 +129,7 @@ export function ProfileScreen({ username }: { username: string }) {
               id: "recent",
               content:
                 history === null ? (
-                  <LobbyListSkeleton rows={3} />
+                  <HistorySkeleton />
                 ) : history.length === 0 ? (
                   <EmptyState>
                     {isOwner ? "No finished battles yet. Your results will show up here." : "No shared battles to show yet."}
@@ -160,6 +163,43 @@ export function ProfileScreen({ username }: { username: string }) {
         />
       )}
     </div>
+  );
+}
+
+export function ProfileSkeleton() {
+  return (
+    <SkeletonGroup label="Loading profile" className="flex flex-col gap-10">
+      <Card className="flex flex-col gap-8 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start gap-6">
+          <SkeletonAvatar size="xl" />
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex min-w-0 flex-col gap-1">
+              <SkeletonText className="w-56 text-3xl sm:text-4xl" />
+              <SkeletonText className="w-44 text-sm" />
+            </div>
+            <SkeletonText className="w-full max-w-md text-[15px]" />
+          </div>
+        </div>
+        <StatStrip stats={["Wins", "Ties", "Battles", "Win rate"].map((label) => ({ label, value: <SkeletonText className="w-10" /> }))} />
+      </Card>
+      <section className="flex flex-col gap-5">
+        <Tabs label="Profile sections" items={SECTION_TABS} active="recent" />
+        <HistorySkeleton />
+      </section>
+    </SkeletonGroup>
+  );
+}
+
+function HistorySkeleton() {
+  return (
+    <ListTableSkeleton
+      columns={COLUMNS}
+      rows={3}
+      label="Loading recent battles"
+      thumb={<Skeleton className="h-12 w-12 rounded-md" />}
+      subtitle={<SkeletonText className="w-20" />}
+      cellWidths={["w-10", "w-8", "w-6", "w-20"]}
+    />
   );
 }
 

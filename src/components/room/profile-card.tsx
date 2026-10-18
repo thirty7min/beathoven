@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useIsOnline } from "@/components/presence-provider";
+import { SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
 import { StatStrip } from "@/components/ui/stat-strip";
 import type { RoomPlayer } from "@/lib/game/types";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { displayName } from "@/lib/ui/display-name";
+
+const STAT_LABELS = ["Wins", "Ties", "Battles"];
 
 export function ProfileCard({
   player,
@@ -74,7 +77,13 @@ export function ProfileCard({
             </div>
           </div>
           {loading ? (
-            <div className="h-16 animate-pulse rounded-xl bg-raised" />
+            <SkeletonGroup label="Loading profile" className="flex flex-col gap-5">
+              <span className="flex flex-col text-sm">
+                <SkeletonText className="w-full" />
+                <SkeletonText className="w-2/3" />
+              </span>
+              <StatStrip className="rounded-xl border border-line p-4" stats={STAT_LABELS.map((label) => ({ label, value: <SkeletonText className="w-6" /> }))} />
+            </SkeletonGroup>
           ) : (
             <>
               {loaded?.bio && <p className="text-sm whitespace-pre-line text-muted">{loaded.bio}</p>}

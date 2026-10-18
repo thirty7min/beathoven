@@ -10,6 +10,7 @@ import { Avatar } from "./ui/avatar";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
+import { SkeletonAvatar, SkeletonGroup } from "./ui/skeleton";
 import { notifyFailure } from "@/lib/ui/notify";
 import { displayName } from "@/lib/ui/display-name";
 
@@ -38,7 +39,7 @@ export function UserMenu() {
     };
   }, [open]);
 
-  if (status === "loading") return <div className="h-9 w-9 animate-pulse rounded-full bg-raised" />;
+  if (status === "loading") return <AccountSkeleton />;
 
   if (status === "signed_out") {
     return (
@@ -79,7 +80,7 @@ export function UserMenu() {
         aria-label="Account menu"
         className="flex items-center gap-1.5 rounded-full transition hover:opacity-90"
       >
-        <Avatar name={name} url={profile?.avatar_url} seed={user?.id} size="sm" />
+        {profile ? <Avatar name={name} url={profile.avatar_url} seed={user?.id} size="sm" /> : <SkeletonAvatar size="sm" />}
         <ChevronDown className="h-4 w-4 text-muted" />
       </button>
       {open && (
@@ -122,5 +123,14 @@ export function UserMenu() {
         </div>
       )}
     </div>
+  );
+}
+
+function AccountSkeleton() {
+  return (
+    <SkeletonGroup label="Loading account" className="flex items-center gap-1.5">
+      <SkeletonAvatar size="sm" />
+      <ChevronDown aria-hidden className="h-4 w-4 text-subtle" />
+    </SkeletonGroup>
   );
 }
