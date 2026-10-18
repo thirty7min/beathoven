@@ -18,6 +18,7 @@ Multiplayer beat battles: Next.js (App Router) + Supabase (Postgres, Auth, Realt
 - `pnpm typecheck`: generate route types and run `tsc`
 - `pnpm lint`
 - `pnpm test`: unit tests plus the SQL state machine tests, which run the migrations in PGlite against stubbed `auth`, `realtime` and `storage` schemas (`supabase/tests/stubs.sql`)
+- `pnpm release <patch|minor|major>`: cut a release (see [Releasing](#releasing))
 
 ## How room state works
 
@@ -84,3 +85,13 @@ $$);
 ### Supabase free tier
 
 500 MB database, 1 GB storage, 5 GB egress per month, 200 concurrent Realtime connections, 50k monthly active users, and the project pauses after a week without activity. Submissions are up to 50 MB and every listener streams every track, so storage and egress run out first. Watch Usage in the dashboard, or move to Pro before inviting a crowd. Vercel Hobby is for non-commercial use only.
+
+## Releasing
+
+`package.json` holds the version. The footer shows it and links to its GitHub Release.
+
+1. As you merge changes, add short user-facing notes under `## [Unreleased]` in `CHANGELOG.md` (Added, Changed, Fixed).
+2. On a clean, up-to-date `main`, run `pnpm release patch`, `minor` or `major`. It bumps `package.json`, moves the Unreleased notes into a dated section, commits `Release vX.Y.Z` and creates the annotated tag `vX.Y.Z`. It refuses a dirty tree, a branch other than `main` or empty Unreleased notes, and it never pushes.
+3. Push the commit and the tag with the command it prints: `git push origin main vX.Y.Z`.
+
+Vercel deploys `main`, so the footer shows the new version. The tag triggers `.github/workflows/release.yml`, which checks the tag matches `package.json` and creates the GitHub Release from that version's `CHANGELOG.md` section.

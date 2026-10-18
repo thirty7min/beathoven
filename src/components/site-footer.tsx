@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { releaseUrl } from "@/lib/release";
 import { useOnlineCount } from "./presence-provider";
+
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "";
 
 const LINKS = [
   { href: "/", label: "Home" },
@@ -28,7 +31,9 @@ export function SiteFooter() {
             Online: {online ?? "–"}
             <span className={online ? "h-2 w-2 rounded-full bg-online" : "h-2 w-2 rounded-full bg-subtle"} aria-hidden />
           </span>
-          <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+          <a href={releaseUrl(APP_VERSION)} target="_blank" rel="noopener noreferrer" className="transition hover:text-fg">
+            v{APP_VERSION}
+          </a>
         </div>
       </div>
     </footer>
