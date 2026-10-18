@@ -2,7 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { suggestUsername } from "@/lib/profile/validate";
+import { DISPLAY_NAME_MAX } from "@/lib/profile/validate";
 import { AuthError, useAuth, type OAuthProvider } from "./auth-provider";
 import { Button } from "./ui/button";
 import { LegalNotice } from "./legal/legal-notice";
@@ -53,21 +53,21 @@ export function AuthPanel({ next, onDone }: { next?: string; onDone?: () => void
             id="guest-name"
             className="rounded-full px-4"
             autoComplete="nickname"
-            placeholder="Pick a producer name"
+            placeholder="Your display name"
             value={name}
-            maxLength={24}
+            maxLength={DISPLAY_NAME_MAX * 2}
             onChange={(e) => {
-              setName(suggestUsername(e.target.value));
+              setName(e.target.value);
               setError(null);
             }}
           />
-          <Button type="submit" variant="primary" loading={busy === "guest"} disabled={busy !== null || name.length < 3}>
+          <Button type="submit" variant="primary" loading={busy === "guest"} disabled={busy !== null || name.trim().length === 0}>
             Play
             <ArrowRight className="h-4 w-4" />
           </Button>
         </div>
         <p className={error ? "text-xs text-danger" : "text-xs text-muted"}>
-          {error ?? "3 to 24 letters, numbers or underscores."}
+          {error ?? `The name others see, up to ${DISPLAY_NAME_MAX} characters. Emoji welcome.`}
         </p>
       </form>
 

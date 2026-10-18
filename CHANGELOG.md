@@ -4,6 +4,10 @@ Notable changes to Beathoven. The format follows [Keep a Changelog](https://keep
 
 ## [Unreleased]
 
+### Changed
+
+- Guests now pick a display name, and get a random username automatically.
+
 ## [0.1.0] - 2026-10-18
 
 ### Added

@@ -2,8 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { toast } from "sonner";
-import { escapeLike, validateUsername } from "@/lib/profile/validate";
+import { escapeLike, normalizeDisplayName, validateDisplayName } from "@/lib/profile/validate";
 import { getBrowserClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 import { notifyFailure } from "@/lib/ui/notify";
@@ -20,7 +19,7 @@ type AuthContextValue = {
   isGuest: boolean;
   refreshProfile: () => Promise<void>;
   setProfile: (profile: Profile) => void;
-  signInAsGuest: (username: string) => Promise<void>;
+  signInAsGuest: (displayName: string) => Promise<void>;
   signInWithProvider: (provider: OAuthProvider, next?: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -98,29 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [userId]);
 
   const signInAsGuest = useCallback(
-    async (username: string) => {
-    const name = username.trim();
-    const invalid = validateUsername(name);
+    async (displayName: string) => {
+    const name = normalizeDisplayName(displayName);
+    const invalid = validateDisplayName(name);
     if (invalid) throw new AuthError(invalid);
-    if (await isUsernameTaken(name)) throw new AuthError("That name is taken. Try another one.");
 
     const supabase = getBrowserClient();
-    const { data, error } = await supabase.auth.signInAnonymously();
+    const { data, error } = await supabase.auth.signInAnonymously({ options: { data: { display_name: name } } });
     if (error || !data.user) throw new AuthError(error?.message ?? "Couldn't start a guest session.");
 
-    const { data: updated, error: updateError } = await supabase
-      .from("profiles")
-      .update({ username: name })
-      .eq("id", data.user.id)
-      .select("*")
-      .maybeSingle();
-    if (updateError) {
-      toast.warning("You're in, but that name was just taken", {
-        description: "You can change it from your profile.",
-      });
-      return;
-    }
-    if (updated) setProfile(updated);
+    const profile = await fetchProfile(data.user.id);
+    if (profile) setProfile(profile);
     },
     [setProfile],
   );
