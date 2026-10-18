@@ -1,0 +1,16 @@
+fpcalc 1.6.2 (Chromaprint), static build for linux-x86_64
+
+This binary is downloaded unmodified at build time from the official
+Chromaprint release:
+https://github.com/acoustid/chromaprint/releases/tag/v1.6.2
+
+Chromaprint is released under the MIT license; the fpcalc tool links
+statically against FFmpeg, so this binary as a whole is covered by the
+GNU Lesser General Public License, version 2.1 or later:
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
+
+Corresponding source:
+- Chromaprint: https://github.com/acoustid/chromaprint/releases/download/v1.6.2/chromaprint-1.6.2.tar.gz
+- FFmpeg: https://ffmpeg.org/download.html#releases (version reported by `fpcalc -version`)
+
+Beathoven runs fpcalc as a separate process and does not modify it.

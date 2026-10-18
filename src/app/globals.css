@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme {
+  --color-page: #0a0a0a;
+  --color-surface: #121212;
+  --color-raised: #1c1c1c;
+  --color-hover: #262626;
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-line-strong: rgb(255 255 255 / 0.16);
+  --color-fg: #ffffff;
+  --color-muted: #a1a1a1;
+  --color-subtle: #6e6e6e;
+  --color-danger: #f87171;
+  --color-online: #22c55e;
+  --color-warn: #eab308;
+
+  --animate-eq: eq 1s ease-in-out infinite;
+  --ease-snappy: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-move: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-fade-in: fade-in 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-pop: pop 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-sheet: sheet 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-menu: menu 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-tooltip: menu 125ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-drop-in: drop-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-swap: swap 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-reveal: reveal 400ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  --animate-crossfade: fade 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-grain: grain 600ms steps(1) infinite;
+
+  @keyframes eq {
+    0%, 100% { transform: scaleY(0.2); }
+    50% { transform: scaleY(1); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pop {
+    from { transform: scale(0.96); opacity: 0; }
+  }
+  @keyframes sheet {
+    from { transform: translateY(100%); }
+  }
+  @keyframes menu {
+    from { transform: scale(0.97); opacity: 0; }
+  }
+  @keyframes drop-in {
+    from { transform: translateY(-6px); opacity: 0; }
+  }
+  @keyframes swap {
+    from { transform: scale(0.9); opacity: 0; }
+  }
+  @keyframes reveal {
+    from { transform: translateY(8px) scale(0.98); opacity: 0; }
+  }
+  @keyframes fade {
+    from { opacity: 0; }
+  }
+  @keyframes grain {
+    0% { transform: translate(0, 0); }
+    17% { transform: translate(-7%, 5%); }
+    33% { transform: translate(6%, -9%); }
+    50% { transform: translate(-4%, -6%); }
+    67% { transform: translate(9%, 4%); }
+    83% { transform: translate(-8%, 8%); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop,
+  .animate-sheet,
+  .animate-menu,
+  .animate-tooltip,
+  .animate-drop-in,
+  .animate-swap,
+  .animate-reveal,
+  .animate-fade-in {
+    animation-name: fade;
+  }
+  .animate-grain {
+    animation: none;
+  }
+}
+
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.15) transparent;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-page);
+  color: var(--color-fg);
+}
+
+::selection {
+  background: rgb(255 255 255 / 0.25);
+}
+
+input[type="range"] {
+  accent-color: #ffffff;
+}
