@@ -15,7 +15,7 @@ import { activePlayers, hasSubmitted, memberBadge } from "@/lib/game/lobby";
 import { currentSubmission } from "@/lib/game/phase";
 import { revealedProducer } from "@/lib/game/room-extras";
 import type { RoomPlayer, RoomSnapshot } from "@/lib/game/types";
-import { ProfileCard } from "./profile-card";
+import { ProfileCard, prefetchProfile } from "./profile-card";
 import { displayName } from "@/lib/ui/display-name";
 
 export function PlayerList({
@@ -62,6 +62,7 @@ export function PlayerList({
               key={player.user_id}
               className="grid-cols-[minmax(0,1fr)_auto] px-0 py-2.5"
               onClick={() => setSelected(player)}
+              onPrefetch={() => void prefetchProfile(player.user_id)}
               thumb={
                 <span className="relative inline-flex">
                   <Avatar name={displayName(player)} url={player.avatar_url} seed={player.user_id} size="md" />

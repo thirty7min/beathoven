@@ -7,7 +7,7 @@ import { cn } from "@/components/ui/cn";
 import { continuesRun, isEmojiOnly } from "@/lib/game/chat";
 import { isSystemMessage } from "@/lib/game/kick";
 import type { ChatMessage, RoomPlayer } from "@/lib/game/types";
-import { ProfileCard } from "./profile-card";
+import { ProfileCard, prefetchProfile } from "./profile-card";
 import { useRoomAction } from "./use-room-action";
 import { displayName } from "@/lib/ui/display-name";
 
@@ -90,12 +90,13 @@ export function ChatPanel({
             const name = displayName(m);
             const sender = m.user_id ? (playerById.get(m.user_id) ?? null) : null;
             const openProfile = sender ? () => setSelected(sender) : undefined;
+            const prefetch = sender ? () => void prefetchProfile(sender.user_id) : undefined;
             return (
               <div key={m.id} className={cn("flex items-start gap-2.5", grouped ? "mt-0.5" : "mt-3 first:mt-0")}>
                 {grouped ? (
                   <span aria-hidden className="w-6 shrink-0" />
                 ) : (
-                  <button type="button" onClick={openProfile} disabled={!sender} aria-label={`View ${name}'s profile`} className="mt-0.5 shrink-0 rounded-full">
+                  <button type="button" onClick={openProfile} onPointerEnter={prefetch} onFocus={prefetch} disabled={!sender} aria-label={`View ${name}'s profile`} className="mt-0.5 shrink-0 rounded-full">
                     <Avatar name={name} url={sender?.avatar_url} seed={m.user_id ?? name} size="xs" />
                   </button>
                 )}
@@ -105,6 +106,8 @@ export function ChatPanel({
                       <button
                         type="button"
                         onClick={openProfile}
+                        onPointerEnter={prefetch}
+                        onFocus={prefetch}
                         disabled={!sender}
                         className={cn("font-semibold enabled:hover:underline", m.user_id === hostId || mine ? "text-fg" : "text-muted")}
                       >

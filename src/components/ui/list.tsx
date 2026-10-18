@@ -41,6 +41,7 @@ export function ListRow({
   trailing,
   className,
   onClick,
+  onPrefetch,
   active,
 }: {
   thumb?: ReactNode;
@@ -50,6 +51,7 @@ export function ListRow({
   trailing?: ReactNode;
   className?: string;
   onClick?: () => void;
+  onPrefetch?: () => void;
   active?: boolean;
 }) {
   const columns = use(ColumnsContext);
@@ -72,7 +74,7 @@ export function ListRow({
       )}
     >
       {onClick ? (
-        <button onClick={onClick} className="-m-1 min-w-0 rounded-lg p-1 text-left transition hover:bg-white/[0.04]">
+        <button onClick={onClick} onPointerEnter={onPrefetch} onFocus={onPrefetch} className="-m-1 min-w-0 rounded-lg p-1 text-left transition hover:bg-white/[0.04]">
           {main}
         </button>
       ) : (

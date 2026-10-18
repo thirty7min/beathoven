@@ -11,13 +11,40 @@ import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useIsOnline } from "@/components/presence-provider";
-import { SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonGroup, SkeletonText } from "@/components/ui/skeleton";
 import { StatStrip } from "@/components/ui/stat-strip";
 import type { RoomPlayer } from "@/lib/game/types";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { displayName } from "@/lib/ui/display-name";
 
 const STAT_LABELS = ["Wins", "Ties", "Battles"];
+const FRESH_MS = 30_000;
+
+type CachedProfile = { at: number; promise: Promise<Profile | null>; data?: Profile | null };
+
+const profiles = new Map<string, CachedProfile>();
+
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await getBrowserClient().from("profiles").select("*").eq("id", userId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export function prefetchProfile(userId: string): Promise<Profile | null> {
+  const previous = profiles.get(userId);
+  if (previous && Date.now() - previous.at < FRESH_MS) return previous.promise;
+  const entry: CachedProfile = { at: Date.now(), promise: fetchProfile(userId), data: previous?.data };
+  entry.promise.then(
+    (data) => {
+      entry.data = data;
+    },
+    () => {
+      entry.at = 0;
+    },
+  );
+  profiles.set(userId, entry);
+  return entry.promise;
+}
 
 export function ProfileCard({
   player,
@@ -35,21 +62,18 @@ export function ProfileCard({
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
-    void getBrowserClient()
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setProfile({ id: userId, data });
-      });
+    prefetchProfile(userId).then(
+      (data) => !cancelled && setProfile({ id: userId, data }),
+      () => !cancelled && setProfile({ id: userId, data: profiles.get(userId)?.data ?? null }),
+    );
     return () => {
       cancelled = true;
     };
   }, [userId]);
 
-  const loaded = profile?.id === userId ? profile.data : null;
-  const loading = profile?.id !== userId;
+  const fetched = profile?.id === userId ? profile.data : userId ? profiles.get(userId)?.data : undefined;
+  const loading = fetched === undefined;
+  const loaded = fetched ?? null;
   const username = loaded?.username ?? player?.username ?? "";
   const name = displayName(loaded ?? player, username);
 
@@ -82,6 +106,11 @@ export function ProfileCard({
                 <SkeletonText className="w-full" />
                 <SkeletonText className="w-2/3" />
               </span>
+              <span className="flex items-center gap-1.5">
+                <Skeleton className="h-7 w-24 rounded-full" />
+                <Skeleton className="h-7 w-20 rounded-full" />
+              </span>
+              <SkeletonText className="w-36 text-sm" />
               <StatStrip className="rounded-xl border border-line p-4" stats={STAT_LABELS.map((label) => ({ label, value: <SkeletonText className="w-6" /> }))} />
             </SkeletonGroup>
           ) : (
