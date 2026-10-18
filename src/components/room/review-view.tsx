@@ -12,6 +12,7 @@ import { useWaveform } from "@/hooks/use-waveform";
 import { isTransientError } from "@/lib/game/error-kind";
 import { formatClock } from "@/lib/game/format";
 import { phaseCountdown } from "@/lib/game/phase";
+import { isSpectating } from "@/lib/game/spectate";
 import { SUBMISSIONS_BUCKET } from "@/lib/game/storage";
 import type { RoomPlayer } from "@/lib/game/types";
 import { sendVoteQuietly } from "@/lib/game/voting";
@@ -35,6 +36,7 @@ export function ReviewView({ room, serverNow }: { room: RoomController; serverNo
   const countdown = phaseCountdown(snapshot.room, snapshot.submissions, now);
   const remaining = countdown?.label === "review" ? countdown.remainingMs : 0;
   const player = (id: string | null) => (id ? (snapshot.players.find((p) => p.user_id === id) ?? null) : null);
+  const spectating = isSpectating(snapshot);
 
   function rate(submissionId: string, score: number) {
     setOverrides({ ...pendingOverrides, [submissionId]: score });
@@ -50,7 +52,9 @@ export function ReviewView({ room, serverNow }: { room: RoomController; serverNo
           <p className="text-[clamp(3.5rem,12vw,7rem)] leading-none font-black tracking-tighter tabular-nums" role="timer" aria-live="off">
             {formatClock(remaining)}
           </p>
-          <p className="text-sm text-muted">Last chance to listen back and change your ratings before results.</p>
+          <p className="text-sm text-muted">
+            {spectating ? "Players are making their last rating changes before results." : "Last chance to listen back and change your ratings before results."}
+          </p>
         </div>
 
         <ol className="flex flex-col gap-2">
@@ -68,13 +72,17 @@ export function ReviewView({ room, serverNow }: { room: RoomController; serverNo
               onLeave={() => preview.leave(row.submissionId)}
               onTap={(url, limitMs, startMs) => preview.tap(row.submissionId, url, limitMs, startMs, row.boostDb)}
               onSeek={(ms) => preview.seek(row.submissionId, ms)}
-              onRate={(score) => rate(row.submissionId, score)}
+              onRate={spectating ? null : (score) => rate(row.submissionId, score)}
             />
           ))}
         </ol>
 
         <div className="sticky bottom-20 z-10 flex flex-col items-center gap-2 lg:bottom-6">
-          {progress.meDone ? (
+          {spectating ? (
+            <p key="spectating" className="flex animate-swap items-center gap-2 rounded-full border border-line-strong bg-surface px-5 py-3 text-sm font-semibold shadow-2xl tabular-nums">
+              Spectating · {progress.done}/{progress.total} done
+            </p>
+          ) : progress.meDone ? (
             <p key="waiting" className="flex animate-swap items-center gap-2 rounded-full border border-line-strong bg-surface px-5 py-3 text-sm font-semibold shadow-2xl tabular-nums">
               <Check className="h-4 w-4" />
               Waiting for others · {progress.done}/{progress.total} done
@@ -91,7 +99,7 @@ export function ReviewView({ room, serverNow }: { room: RoomController; serverNo
               Done
             </Button>
           )}
-          {progress.meDone && <p className="text-xs text-muted">You can still change ratings until the timer ends.</p>}
+          {progress.meDone && !spectating && <p className="text-xs text-muted">You can still change ratings until the timer ends.</p>}
         </div>
       </div>
     </div>
@@ -123,7 +131,7 @@ function ReviewItem({
   onLeave: () => void;
   onTap: (url: string, limitMs: number | null, startMs: number) => void;
   onSeek: (ms: number) => void;
-  onRate: (score: number) => void;
+  onRate: ((score: number) => void) | null;
 }) {
   const { url, error } = useSignedUrl(SUBMISSIONS_BUCKET, row.storagePath);
   const { peaks } = useWaveform(row.storagePath, url, row.clipMs, row.clipStartMs);
@@ -172,9 +180,9 @@ function ReviewItem({
       <span className="justify-self-end">
         {row.mine ? (
           <RatingPill>Your track</RatingPill>
-        ) : (
+        ) : onRate ? (
           <RatingSegments score={row.score} label={`Rating for ${row.label}`} onRate={onRate} />
-        )}
+        ) : null}
       </span>
     </li>
   );

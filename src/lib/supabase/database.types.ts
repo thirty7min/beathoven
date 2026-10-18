@@ -16,6 +16,7 @@ type Table<Row, Required extends keyof Row = never> = {
 
 export type RoomMode = "classic" | "premade" | "creative";
 export type RoomStatus = "lobby" | "producing" | "listening" | "reviewing" | "results" | "closed";
+export type RoomRole = "player" | "spectator";
 export type SampleCategory =
   | "kick"
   | "snare"
@@ -108,6 +109,7 @@ export type Database = {
           left_at: string | null;
           last_seen_at: string;
           is_ready: boolean;
+          role: RoomRole;
         },
         "room_id" | "user_id"
       >;

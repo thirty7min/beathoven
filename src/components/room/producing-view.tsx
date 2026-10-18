@@ -6,6 +6,7 @@ import { formatClock } from "@/lib/game/format";
 import { UPLOAD_GRACE_MS, phaseCountdown } from "@/lib/game/phase";
 import { submitPhaseCopy } from "@/lib/game/phase-label";
 import { phaseStat } from "@/lib/game/room-view";
+import { isSpectating } from "@/lib/game/spectate";
 import { SampleList } from "./sample-list";
 import { StageCounter, StageHeader } from "./stage";
 import type { RoomController } from "./types";
@@ -27,6 +28,7 @@ export function ProducingView({ room, serverNow }: { room: RoomController; serve
   const remaining = countdown?.label === "produce" ? countdown.remainingMs : 0;
   const clockLabel = countdown?.label === "upload" ? "Time's up, last uploads landing" : copy.countdown;
   const submitted = phaseStat(snapshot);
+  const spectating = isSpectating(snapshot);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -51,7 +53,7 @@ export function ProducingView({ room, serverNow }: { room: RoomController; serve
         )}
         {state.mode === "creative" && (
           <section className="flex flex-col items-center gap-3 text-center">
-            <Eyebrow>Your prompt</Eyebrow>
+            <Eyebrow>{spectating ? "The prompt" : "Your prompt"}</Eyebrow>
             <p className="text-3xl leading-tight font-bold tracking-tight text-balance sm:text-4xl">
               {prompt ? `“${prompt}”` : "No prompt this time. Make anything you like."}
             </p>
@@ -66,16 +68,20 @@ export function ProducingView({ room, serverNow }: { room: RoomController; serve
           </section>
         )}
 
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xl font-bold">Your submission</h2>
-          <UploadPanel
-            room={room}
-            mySubmission={mySubmission}
-            closesInMs={phaseEnd !== null ? Math.max(0, phaseEnd - now) : null}
-            lastCall={produceOver}
-            closed={closed}
-          />
-        </section>
+        {spectating ? (
+          <p className="text-center text-sm text-muted">You&apos;re spectating. Tracks play for everyone once the timer ends.</p>
+        ) : (
+          <section className="flex flex-col gap-4">
+            <h2 className="text-xl font-bold">Your submission</h2>
+            <UploadPanel
+              room={room}
+              mySubmission={mySubmission}
+              closesInMs={phaseEnd !== null ? Math.max(0, phaseEnd - now) : null}
+              lastCall={produceOver}
+              closed={closed}
+            />
+          </section>
+        )}
       </div>
     </div>
   );

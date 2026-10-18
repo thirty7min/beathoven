@@ -21,7 +21,7 @@ type State = {
     current_track: number | null;
     track_started_at: string | null;
   };
-  players: { user_id: string; left_at: string | null; last_seen_at: string; is_ready: boolean }[];
+  players: { user_id: string; left_at: string | null; last_seen_at: string; is_ready: boolean; role: string }[];
   assets: { kind: string; position: number; prompt: string | null; sample: { id: number; category: string } | null }[];
   readiness: { ready: number; total: number; all_ready: boolean; can_start: boolean };
   submissions: { id: string; user_id: string | null; storage_path: string; duration_ms: number; submitted_at: string | null }[];
@@ -144,23 +144,23 @@ describe("create / join / capacity", () => {
     expect(joined.room_id).toBe(room.room_id);
     const again = await rpc<RoomRef>(db, b, "join_room", { p_code: room.code });
     expect(again.version).toBe(joined.version);
-    expect(await rpcError(db, c, "join_room", { p_code: room.code })).toBe("room_full");
+    expect(await rpc<RoomRef & { role: string }>(db, c, "join_room", { p_code: room.code })).toMatchObject({ role: "spectator" });
     expect(await rpcError(db, c, "join_room", { p_code: "ZZZZZZ" })).toBe("room_not_found");
 
     await rpc(db, b, "leave_room", { p_room_id: room.room_id });
-    await rpc(db, c, "join_room", { p_code: room.code });
-    expect(await rpcError(db, b, "join_room", { p_code: room.code })).toBe("room_full");
+    expect((await snapshot(a, room.room_id)).players.find((p) => p.user_id === c)).toMatchObject({ role: "player", left_at: null });
+    expect(await rpc<RoomRef & { role: string }>(db, b, "join_room", { p_code: room.code })).toMatchObject({ role: "spectator" });
   });
 
-  it("blocks new players once the game has started", async () => {
+  it("seats newcomers as spectators once the game has started", async () => {
     const { players, roomId, code } = await roomWith(2);
-    const [outsider] = await users(1);
+    const [outsider, late] = await users(2);
     await startGame(players[0], roomId);
-    expect(await rpcError(db, outsider, "join_room", { p_code: code })).toBe("room_in_progress");
+    expect(await rpc<RoomRef & { role: string }>(db, outsider, "join_room", { p_code: code })).toMatchObject({ role: "spectator" });
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });
     expect((await snapshot(players[0], roomId)).room.status).toBe("results");
-    expect(await rpcError(db, outsider, "join_room", { p_code: code })).toBe("room_in_progress");
+    expect(await rpc<RoomRef & { role: string }>(db, late, "join_room", { p_code: code })).toMatchObject({ role: "spectator" });
   });
 
   it("lets an active member re-join mid-game as a no-op", async () => {
@@ -168,16 +168,16 @@ describe("create / join / capacity", () => {
     await startGame(players[0], roomId);
     const before = await snapshot(players[1], roomId);
     const again = await rpc<RoomRef>(db, players[1], "join_room", { p_code: code });
-    expect(again).toEqual({ room_id: roomId, code, version: before.version });
+    expect(again).toEqual({ room_id: roomId, code, version: before.version, role: "player" });
     expect(withoutHeartbeat((await snapshot(players[1], roomId)).players)).toEqual(withoutHeartbeat(before.players));
   });
 
-  it("keeps a player who left mid-game out until the room is back in the lobby", async () => {
+  it("lets a player who left mid-game watch, then plays again back in the lobby", async () => {
     const { players, roomId, code } = await roomWith(3);
     const [outsider] = await users(1);
     await startGame(players[0], roomId);
     await rpc(db, players[2], "leave_room", { p_room_id: roomId });
-    expect(await rpcError(db, players[2], "join_room", { p_code: code })).toBe("room_in_progress");
+    expect(await rpc<RoomRef & { role: string }>(db, players[2], "join_room", { p_code: code })).toMatchObject({ role: "spectator" });
 
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });
@@ -189,6 +189,7 @@ describe("create / join / capacity", () => {
     await rpc(db, outsider, "join_room", { p_code: code });
     const active = (await snapshot(players[0], roomId)).players.filter((p) => p.left_at === null);
     expect(active.map((p) => p.user_id).sort()).toEqual([players[0], players[1], players[2], outsider].sort());
+    expect(active.every((p) => p.role === "player")).toBe(true);
   });
 
   it("lets a player rejoin after leaving", async () => {
@@ -229,11 +230,11 @@ describe("create / join / capacity", () => {
     expect((await snapshot(a, second.room_id)).players.map((p) => p.user_id)).toEqual([a]);
   });
 
-  it("keeps the previous room when the new one is full", async () => {
+  it("spectates a full room, leaving the previous one", async () => {
     const roomA = await roomWith(2);
     const roomB = await roomWith(2, { p_max_players: 2 });
-    expect(await rpcError(db, roomA.players[1], "join_room", { p_code: roomB.code })).toBe("room_full");
-    expect((await snapshot(roomA.players[1], roomA.roomId)).players.every((p) => p.left_at === null)).toBe(true);
+    expect(await rpc<RoomRef & { role: string }>(db, roomA.players[1], "join_room", { p_code: roomB.code })).toMatchObject({ role: "spectator" });
+    expect((await snapshot(roomA.players[0], roomA.roomId)).players.find((p) => p.user_id === roomA.players[1])!.left_at).not.toBeNull();
   });
 
   it("rejoining the current room is a no-op", async () => {

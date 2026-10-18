@@ -12,12 +12,14 @@ import { cn } from "@/components/ui/cn";
 import { Dialog } from "@/components/ui/dialog";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { activePlayers } from "@/lib/game/lobby";
+import { isSpectating } from "@/lib/game/spectate";
 import type { RoomSnapshot } from "@/lib/game/types";
 import { ChatPanel } from "./chat-panel";
 import { ConnectionBadge, ReconnectingNotice } from "./connection-badge";
 import { PlayerList } from "./player-list";
 import { MobileDock } from "./mobile-dock";
 import { ShellBackdropProvider } from "./shell-backdrop";
+import { SpectatingBadge } from "./spectating-badge";
 import type { RoomController } from "./types";
 import { useKickActions } from "./use-kick-actions";
 
@@ -44,6 +46,8 @@ export function GameShell({
   const unread = chatOpen ? 0 : snapshot.chat.filter((m) => m.id > seen && m.user_id !== snapshot.me).length;
   const [backdrop, setBackdrop] = useState<HTMLDivElement | null>(null);
   const glass = state.status === "listening";
+  const spectating = isSpectating(snapshot);
+  const confirmsLeave = leaveNeedsConfirm(state.status, spectating ? "spectator" : "player");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -64,10 +68,11 @@ export function GameShell({
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-4">
         <Logo collapse />
         <span className="min-w-0 truncate text-sm text-muted lg:hidden">{state.name || `Room ${state.code}`}</span>
+        {spectating && <SpectatingBadge className="shrink-0" />}
         <div className="ml-auto flex items-center gap-1">
           <VolumeControl />
           <ConnectionBadge status={room.connection} compact />
-          <Button size="sm" variant="outline" className="ml-1" loading={leaving && !confirmLeave} onClick={() => (leaveNeedsConfirm(state.status) ? setConfirmLeave(true) : onLeave())}>
+          <Button size="sm" variant="outline" className="ml-1" loading={leaving && !confirmLeave} onClick={() => (confirmsLeave ? setConfirmLeave(true) : onLeave())}>
             <LogOut className="h-4 w-4" />
             Leave
           </Button>
@@ -131,8 +136,8 @@ export function GameShell({
 
       <MobileDock snapshot={snapshot} onSend={room.actions.sendChat} now={serverNow} glass={glass} {...kick} />
 
-      <Dialog open={confirmLeave && leaveNeedsConfirm(state.status)} onClose={() => setConfirmLeave(false)} title="Leave this game?">
-        <p className="text-sm text-muted">The game is still going. If you leave now you&apos;ll miss the rest and can&apos;t rejoin until it ends.</p>
+      <Dialog open={confirmLeave && confirmsLeave} onClose={() => setConfirmLeave(false)} title="Leave this game?">
+        <p className="text-sm text-muted">The game is still going. If you leave now you&apos;re out of this game, though you can come back to watch.</p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirmLeave(false)}>
             Stay

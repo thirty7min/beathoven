@@ -27,6 +27,12 @@ describe("activeRoomPill", () => {
     expect(activeRoomPill(room({ status: "producing", mode: "premade" })).status).toBe("Uploading");
   });
 
+  it("marks a room you're watching", () => {
+    expect(activeRoomPill(room({ status: "listening", role: "spectator" })).status).toBe("Spectating · Listening");
+    expect(activeRoomPill(room({ role: "spectator" })).status).toBe("Spectating · Lobby · 3/8");
+    expect(activeRoomPill(room({ role: "player" })).status).toBe("Lobby · 3/8");
+  });
+
   it("names the genre only when one is set", () => {
     expect(activeRoomPill(room({ genre: "dnb" })).genre).toBe("Drum & Bass");
     expect(activeRoomPill(room({ genre: undefined })).genre).toBeNull();

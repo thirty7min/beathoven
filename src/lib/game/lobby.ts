@@ -1,9 +1,10 @@
+import { isSpectator } from "./spectate";
 import type { RoomPlayer, RoomSnapshot } from "./types";
 
 export const MIN_PLAYERS = 2;
 
 export function activePlayers(players: RoomPlayer[]): RoomPlayer[] {
-  return players.filter((p) => p.left_at === null);
+  return players.filter((p) => p.left_at === null && !isSpectator(p));
 }
 
 export type StartCheck =

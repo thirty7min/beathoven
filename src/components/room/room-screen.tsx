@@ -15,9 +15,14 @@ import { useRoom } from "@/hooks/use-room";
 import { useServerNow } from "@/hooks/use-server-now";
 import { friendlyError } from "@/lib/game/error-messages";
 import { joinGateView } from "@/lib/game/join-gate";
-import { isRemovedError, wasRemoved } from "@/lib/game/kick";
+import { isRemovedError, removalMessage, wasRemoved } from "@/lib/game/kick";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { isRoomCode } from "@/lib/game/room-settings";
+import { GameError } from "@/lib/game/errors";
+import { getRoomSnapshot } from "@/lib/game/rpc";
+import { myRole, wasPromoted } from "@/lib/game/spectate";
+import type { RoomRole } from "@/lib/game/types";
+import { getBrowserClient } from "@/lib/supabase/client";
 import { QUICK_REACTIONS } from "./chat-panel";
 import { ReconnectingNotice } from "./connection-badge";
 import { GameShell } from "./game-shell";
@@ -65,7 +70,7 @@ function JoinGate({ code, userId, debug }: { code: string; userId: string; debug
         <p className="text-sm text-muted">
           You can only be in one room at a time. Joining <span className="font-mono text-fg">{code}</span> takes you out of{" "}
           <span className="font-mono text-fg">{current.code}</span>
-          {leaveNeedsConfirm(current.status) ? ", which has a game in progress." : "."}
+          {leaveNeedsConfirm(current.status, current.role) ? ", which has a game in progress." : "."}
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => setConfirmed(true)}>
@@ -90,16 +95,33 @@ function RoomLive({ code, debug, onRetry }: { code: string; debug: boolean; onRe
   const { snapshot } = room;
   const [leftOnPurpose, setLeftOnPurpose] = useState(false);
   const redirected = useRef(false);
+  const lastRole = useRef<RoomRole | null>(null);
   const removed =
     (room.connection === "error" && isRemovedError(room.error)) ||
     (snapshot !== null && snapshot.room.status !== "closed" && !leftOnPurpose && wasRemoved(snapshot.players, snapshot.me));
 
   useEffect(() => {
+    if (!snapshot) return;
+    if (wasPromoted(lastRole.current === "spectator", snapshot)) toast("A seat opened up. You're playing next game.");
+    lastRole.current = myRole(snapshot) ?? lastRole.current;
+  }, [snapshot]);
+
+  useEffect(() => {
     if (!removed || redirected.current) return;
     redirected.current = true;
-    toast("You were removed from the room");
-    router.push("/play");
-  }, [removed, router]);
+    const roomId = snapshot?.room.id;
+    const banned =
+      room.connection === "error" || !roomId
+        ? Promise.resolve(room.error?.includes("banned_from_room") ?? true)
+        : getRoomSnapshot(getBrowserClient(), roomId).then(
+            () => false,
+            (error: unknown) => !(error instanceof GameError && error.code === "not_member"),
+          );
+    void banned.then((isBanned) => {
+      toast(removalMessage(isBanned, lastRole.current));
+      router.push("/play");
+    });
+  }, [removed, router, room.connection, room.error, snapshot]);
 
   if (removed) return <RoomSkeleton label="Leaving room…" />;
   if (room.connection === "error") {

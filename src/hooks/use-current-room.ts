@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
-import type { RoomStatus } from "@/lib/game/types";
+import type { RoomRole, RoomStatus } from "@/lib/game/types";
 import { useOnHide } from "./use-on-hide";
 
-export type CurrentRoom = { id: string; code: string; status: RoomStatus };
+export type CurrentRoom = { id: string; code: string; status: RoomStatus; role: RoomRole };
 
 export async function fetchCurrentRoom(userId: string): Promise<CurrentRoom | null> {
   const supabase = getBrowserClient();
   const { data: memberships, error } = await supabase
     .from("room_players")
-    .select("room_id, joined_at")
+    .select("room_id, joined_at, role")
     .eq("user_id", userId)
     .is("left_at", null)
     .order("joined_at", { ascending: false });
@@ -26,7 +26,8 @@ export async function fetchCurrentRoom(userId: string): Promise<CurrentRoom | nu
     .neq("status", "closed");
   if (!rooms?.length) return null;
   const order = memberships.map((m) => m.room_id);
-  return [...rooms].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))[0];
+  const room = [...rooms].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))[0];
+  return { ...room, role: memberships.find((m) => m.room_id === room.id)?.role ?? "player" };
 }
 
 const UNLOADED = { userId: null, room: null, loaded: false };

@@ -25,9 +25,10 @@ export function showsReturnPill(room: ActiveRoom | null, pathname: string | null
 
 export function activeRoomPill(room: ActiveRoom): ActiveRoomPill {
   const phase = phaseLabel(room.mode, room.status) ?? "";
+  const status = room.status === "lobby" ? `${phase} · ${room.player_count}/${room.max_players}` : phase;
   return {
     title: roomTitle(room),
-    status: room.status === "lobby" ? `${phase} · ${room.player_count}/${room.max_players}` : phase,
+    status: room.role === "spectator" ? `Spectating · ${status}` : status,
     genre: room.genre && room.genre !== DEFAULT_GENRE ? genreLabel(room.genre) : null,
   };
 }

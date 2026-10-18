@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasSubmitted, memberBadge, readyCount, startCheck } from "./lobby";
+import { activePlayers, hasSubmitted, memberBadge, readyCount, startCheck } from "./lobby";
 import type { RoomPlayer, RoomSnapshot } from "./types";
 
 const player = (user_id: string, over: Partial<RoomPlayer> = {}): RoomPlayer => ({
@@ -74,6 +74,12 @@ describe("startCheck", () => {
     const players = [player("host", { is_ready: true }), player("b", { is_ready: true }), player("gone", { left_at: "x" })];
     expect(startCheck(snap({ players }), true)).toEqual({ kind: "ready" });
   });
+
+  it("never waits on or counts spectators", () => {
+    const players = [player("host", { is_ready: true }), player("b", { is_ready: true }), player("fan", { role: "spectator" })];
+    expect(startCheck(snap({ players }), true)).toEqual({ kind: "ready" });
+    expect(startCheck(snap({ players: [player("host"), player("fan", { role: "spectator" })] }), true).kind).toBe("blocked");
+  });
 });
 
 describe("readyCount", () => {
@@ -81,6 +87,14 @@ describe("readyCount", () => {
     const players = [player("a", { is_ready: true }), player("b"), player("c", { is_ready: true, left_at: "x" }), player("host")];
     expect(readyCount(players)).toEqual({ ready: 1, total: 3 });
     expect(readyCount([...players.slice(0, 3), player("host", { is_ready: true })])).toEqual({ ready: 2, total: 3 });
+    expect(readyCount([...players, player("fan", { role: "spectator" })])).toEqual({ ready: 1, total: 3 });
+  });
+});
+
+describe("activePlayers", () => {
+  it("leaves out spectators and anyone who left", () => {
+    const players = [player("a"), player("fan", { role: "spectator" }), player("gone", { left_at: "x" }), player("b", { role: "player" })];
+    expect(activePlayers(players).map((p) => p.user_id)).toEqual(["a", "b"]);
   });
 });
 

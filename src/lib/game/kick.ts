@@ -1,4 +1,6 @@
-import type { ChatMessage, KickVote, RoomPlayer, RoomSnapshot } from "./types";
+import { activePlayers } from "./lobby";
+import { isSpectating, isSpectator } from "./spectate";
+import type { ChatMessage, KickVote, RoomPlayer, RoomRole, RoomSnapshot } from "./types";
 
 export { kickPlayer, voteKick } from "./rpc";
 
@@ -15,10 +17,10 @@ export const MIN_HUMANS_TO_VOTE_KICK = 3;
 export type KickAction = "kick" | "vote" | "voted" | null;
 
 export function kickActionFor(snapshot: RoomSnapshot, target: RoomPlayer): KickAction {
-  if (target.user_id === snapshot.me || target.left_at !== null) return null;
+  if (target.user_id === snapshot.me || target.left_at !== null || isSpectating(snapshot)) return null;
   if (snapshot.room.host_id === snapshot.me) return "kick";
-  if (target.is_bot) return null;
-  const humans = snapshot.players.filter((p) => p.left_at === null && !p.is_bot).length;
+  if (target.is_bot || isSpectator(target)) return null;
+  const humans = activePlayers(snapshot.players).filter((p) => !p.is_bot).length;
   if (humans < MIN_HUMANS_TO_VOTE_KICK) return null;
   return votedToKick(snapshot, target.user_id) ? "voted" : "vote";
 }
@@ -29,6 +31,11 @@ export function isSystemMessage(message: ChatMessage): boolean {
 
 export function wasRemoved(players: RoomPlayer[], me: string): boolean {
   return !players.some((p) => p.user_id === me && p.left_at === null);
+}
+
+export function removalMessage(banned: boolean, role: RoomRole | null): string {
+  if (banned) return "You were removed from the room";
+  return role === "spectator" ? "You stopped watching after being inactive" : "You left the room after being inactive";
 }
 
 const REMOVED_ERRORS = ["banned_from_room", "not_member"];

@@ -28,6 +28,7 @@ import { VisualizerCanvas, VisualizerControl } from "./visualizer";
 import { Waveform } from "./waveform";
 import { displayName } from "@/lib/ui/display-name";
 import { canVoteSkip, skipLabel } from "@/lib/game/skip";
+import { isSpectating } from "@/lib/game/spectate";
 import { playbackBoostDb } from "@/lib/ui/loudness";
 
 export function ListeningView({ room, serverNow }: { room: RoomController; serverNow: number | null }) {
@@ -60,7 +61,8 @@ export function ListeningView({ room, serverNow }: { room: RoomController; serve
   const total = state.track_order.length;
   const index = Math.min(state.current_track ?? 0, Math.max(0, total - 1));
   const producer = revealedProducer(snapshot, submission);
-  const skip = snapshot.skip?.submission_id === submission?.id ? snapshot.skip : null;
+  const spectating = isSpectating(snapshot);
+  const skip = !spectating && snapshot.skip?.submission_id === submission?.id ? snapshot.skip : null;
 
   function onRate(submissionId: string, score: number) {
     void sendVoteQuietly(() => room.actions.castVote(submissionId, score), isTransientError);
@@ -130,10 +132,14 @@ export function ListeningView({ room, serverNow }: { room: RoomController; serve
             <span>{formatDuration(elapsedMs)}</span>
             <span>{clip !== null ? formatDuration(clip) : "–"}</span>
           </div>
-          {current.error && <p className="text-center text-sm text-danger">This track couldn&apos;t be loaded. You can still rate it.</p>}
+          {current.error && (
+            <p className="text-center text-sm text-danger">
+              {spectating ? "This track couldn't be loaded." : "This track couldn't be loaded. You can still rate it."}
+            </p>
+          )}
         </div>
 
-        {submission && (
+        {submission && !spectating && (
           <RatingDial key={submission.id} submissionId={submission.id} state={vote} onRate={onRate} />
         )}
       </div>

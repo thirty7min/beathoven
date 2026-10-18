@@ -1,8 +1,8 @@
 import type { DawSlug } from "@/lib/profile/daws";
-import type { RoomMode, RoomStatus, SampleCategory } from "@/lib/supabase/database.types";
+import type { RoomMode, RoomRole, RoomStatus, SampleCategory } from "@/lib/supabase/database.types";
 import type { Genre } from "./genres";
 
-export type { RoomMode, RoomStatus, SampleCategory };
+export type { RoomMode, RoomRole, RoomStatus, SampleCategory };
 
 export type Room = {
   id: string;
@@ -38,6 +38,7 @@ export type RoomPlayer = {
   last_seen_at?: string;
   is_ready: boolean;
   is_bot?: boolean;
+  role?: RoomRole;
 };
 
 export type SampleAsset = {
@@ -186,6 +187,7 @@ export type PublicRoom = {
   status: RoomStatus;
   max_players: number;
   player_count: number;
+  spectator_count?: number;
   host_username: string | null;
   host_display_name?: string | null;
   name: string;
@@ -199,4 +201,4 @@ export type PublicRoom = {
 export type ActiveRoom = Pick<
   PublicRoom,
   "id" | "code" | "name" | "mode" | "genre" | "status" | "max_players" | "player_count" | "host_username" | "host_display_name"
->;
+> & { role?: RoomRole };

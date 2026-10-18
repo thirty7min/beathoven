@@ -15,10 +15,12 @@ import { activePlayers, readyCount, startCheck } from "@/lib/game/lobby";
 import { DEFAULT_GENRE } from "@/lib/game/genres";
 import { autostartRemainingMs } from "@/lib/game/phase";
 import { DEFAULT_SETTINGS, hasCustomRules } from "@/lib/game/room-settings";
+import { isSpectating } from "@/lib/game/spectate";
 import type { Room } from "@/lib/game/types";
 import { ChatPanel } from "./chat-panel";
 import { ConnectionBadge } from "./connection-badge";
 import { PlayerList } from "./player-list";
+import { SpectatingBadge } from "./spectating-badge";
 import type { RoomController } from "./types";
 import { useCopy } from "./use-copy";
 import { useKickActions } from "./use-kick-actions";
@@ -46,6 +48,7 @@ export function LobbyView({
   const [chatCollapsed, setChatCollapsed] = useState(false);
 
   const isHost = state.host_id === me;
+  const spectating = isSpectating(snapshot);
   const devTools = useDevToolsEnabled(isHost);
   const kick = useKickActions(state.id);
   const meReady = snapshot.players.find((p) => p.user_id === me)?.is_ready ?? false;
@@ -78,6 +81,7 @@ export function LobbyView({
           <h1 className="truncate text-xl font-bold tracking-tight">{state.name || `Room ${state.code}`}</h1>
           <ModeBadge room={state} />
           <GenreBadge genre={state.genre} />
+          {spectating && <SpectatingBadge />}
           {custom && (
             <button
               onClick={() => setDetailsOpen(true)}
@@ -153,41 +157,49 @@ export function LobbyView({
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Leave room</span>
               </Button>
-              <Button
-                variant={isHost || (meReady && !counting) ? "outline" : "primary"}
-                size="lg"
-                className={cn(!isHost && "flex-1", counting && meReady && isHost && "border-fg")}
-                aria-pressed={meReady}
-                loading={pending === "ready"}
-                onClick={() => run("ready", () => room.actions.setReady(!meReady))}
-              >
-                {counting && meReady ? (
-                  <>
-                    <X className="h-4 w-4" />
-                    Unready
-                  </>
-                ) : meReady ? (
-                  <>
-                    Ready <Check className="h-4 w-4" />
-                  </>
-                ) : (
-                  "Ready up"
-                )}
-              </Button>
-              {isHost &&
-                (counting ? (
-                  <Button variant="primary" size="lg" className="flex-1" loading={pending === "start" || pending === "force"} onClick={() => start(check.kind !== "ready")}>
-                    Start now
+              {spectating ? (
+                <p role="status" className="flex flex-1 animate-swap items-center rounded-full border border-line px-5 text-sm text-muted">
+                  The room is full. You&apos;ll get the next open seat.
+                </p>
+              ) : (
+                <>
+                  <Button
+                    variant={isHost || (meReady && !counting) ? "outline" : "primary"}
+                    size="lg"
+                    className={cn(!isHost && "flex-1", counting && meReady && isHost && "border-fg")}
+                    aria-pressed={meReady}
+                    loading={pending === "ready"}
+                    onClick={() => run("ready", () => room.actions.setReady(!meReady))}
+                  >
+                    {counting && meReady ? (
+                      <>
+                        <X className="h-4 w-4" />
+                        Unready
+                      </>
+                    ) : meReady ? (
+                      <>
+                        Ready <Check className="h-4 w-4" />
+                      </>
+                    ) : (
+                      "Ready up"
+                    )}
                   </Button>
-                ) : check.kind === "ready" ? (
-                  <Button variant="primary" size="lg" className="flex-1" loading={pending === "start"} onClick={() => start(false)}>
-                    Start
-                  </Button>
-                ) : (
-                  <Button variant="primary" size="lg" className="flex-1" disabled={check.kind !== "force"} onClick={() => setConfirmForce(true)}>
-                    Force start
-                  </Button>
-                ))}
+                  {isHost &&
+                    (counting ? (
+                      <Button variant="primary" size="lg" className="flex-1" loading={pending === "start" || pending === "force"} onClick={() => start(check.kind !== "ready")}>
+                        Start now
+                      </Button>
+                    ) : check.kind === "ready" ? (
+                      <Button variant="primary" size="lg" className="flex-1" loading={pending === "start"} onClick={() => start(false)}>
+                        Start
+                      </Button>
+                    ) : (
+                      <Button variant="primary" size="lg" className="flex-1" disabled={check.kind !== "force"} onClick={() => setConfirmForce(true)}>
+                        Force start
+                      </Button>
+                    ))}
+                </>
+              )}
             </div>
             <p className="text-right text-[11px] font-semibold tracking-[0.08em] text-muted uppercase tabular-nums">{caption}</p>
           </div>

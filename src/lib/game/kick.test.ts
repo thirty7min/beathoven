@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRemovedError, isSystemMessage, kickActionFor, kickVoteFor, votedToKick, wasRemoved } from "./kick";
+import { isRemovedError, isSystemMessage, kickActionFor, kickVoteFor, removalMessage, votedToKick, wasRemoved } from "./kick";
 import type { ChatMessage, RoomPlayer, RoomSnapshot } from "./types";
 
 const snapshot = {
@@ -25,6 +25,14 @@ describe("kick helpers", () => {
     expect(wasRemoved(players, "me")).toBe(false);
     expect(wasRemoved([{ user_id: "me", left_at: "2026-01-01" }] as RoomPlayer[], "me")).toBe(true);
     expect(wasRemoved(players.slice(1), "me")).toBe(true);
+    expect(wasRemoved([{ user_id: "me", left_at: null, role: "spectator" }] as RoomPlayer[], "me")).toBe(false);
+  });
+
+  it("tells a kick apart from an idle removal", () => {
+    expect(removalMessage(true, "spectator")).toBe("You were removed from the room");
+    expect(removalMessage(false, "spectator")).toBe("You stopped watching after being inactive");
+    expect(removalMessage(false, "player")).toBe("You left the room after being inactive");
+    expect(removalMessage(false, null)).toBe("You left the room after being inactive");
   });
 
   it("recognizes removal errors", () => {
@@ -53,6 +61,21 @@ describe("kick helpers", () => {
       expect(kickActionFor(three, player("b"))).toBe("vote");
       expect(kickActionFor(three, bot)).toBeNull();
       expect(kickActionFor(room("a", three.players, ["b"]), player("b"))).toBe("voted");
+    });
+
+    it("lets only the host remove a spectator, and never counts spectators toward a vote", () => {
+      const fan = player("fan", { role: "spectator" });
+      const players = [player("host"), player("a"), player("b"), fan];
+      expect(kickActionFor(room("host", players), fan)).toBe("kick");
+      expect(kickActionFor(room("a", players), fan)).toBeNull();
+      const fans = [player("host"), player("a"), fan, player("fan2", { role: "spectator" })];
+      expect(kickActionFor(room("a", fans), player("host"))).toBeNull();
+    });
+
+    it("offers spectators no kick actions at all", () => {
+      const players = [player("host"), player("a"), player("b"), player("fan", { role: "spectator" })];
+      expect(kickActionFor(room("fan", players), player("a"))).toBeNull();
+      expect(kickActionFor(room("fan", players), player("host"))).toBeNull();
     });
 
     it("ignores players who already left", () => {

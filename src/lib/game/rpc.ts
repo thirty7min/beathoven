@@ -1,9 +1,9 @@
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
 import { toGameError } from "./errors";
 import type { Genre } from "./genres";
-import type { ActiveRoom, PublicProfile, PublicRoom, RoomMode, RoomSnapshot } from "./types";
+import type { ActiveRoom, PublicProfile, PublicRoom, RoomMode, RoomRole, RoomSnapshot } from "./types";
 
-export type RoomRef = { room_id: string; code: string; version: number };
+export type RoomRef = { room_id: string; code: string; version: number; role?: RoomRole };
 export type QuickMatchResult = RoomRef & { created: boolean };
 export type AdvanceResult = { advanced: boolean; version: number };
 export type SkipResult = { skipped: boolean; votes: number; needed: number };

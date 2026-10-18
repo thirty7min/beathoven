@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, Link2, Users } from "lucide-react";
+import { Copy, Eye, Link2, Users } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -15,6 +15,7 @@ import { Skeleton, SkeletonGroup, SkeletonText } from "@/components/ui/skeleton"
 import { useServerNow } from "@/hooks/use-server-now";
 import { ServerClock } from "@/lib/game/clock";
 import { etaLabel, phaseStatusLine, roomTitle, splitRooms } from "@/lib/game/room-list";
+import { roomAction, spectatorLabel } from "@/lib/game/spectate";
 import type { PublicRoom } from "@/lib/game/types";
 import { notifyFailure } from "@/lib/ui/notify";
 import { ModeIcon } from "./mode-icon";
@@ -63,8 +64,8 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
 }
 
 function RoomRow({ room, now }: { room: PublicRoom; now: number | null }) {
-  const joinable = room.joinable;
-  const full = room.status === "lobby" && !joinable;
+  const watch = roomAction(room) === "watch";
+  const full = room.status === "lobby" && !room.joinable;
   const phase = now !== null ? phaseStatusLine(room, now) : null;
   const eta = now !== null && room.status !== "lobby" ? etaLabel(room, now) : null;
 
@@ -88,24 +89,34 @@ function RoomRow({ room, now }: { room: PublicRoom; now: number | null }) {
           {full && <Badge>Full</Badge>}
           {phase && <span className="tabular-nums">{phase}</span>}
           {eta && <span>· {eta}</span>}
+          {!!room.spectator_count && (
+            <span className="flex items-center gap-1">
+              <Eye className="h-3 w-3" />
+              <span className="tabular-nums">{spectatorLabel(room.spectator_count)}</span>
+            </span>
+          )}
         </span>
       </span>
-      <span className="shrink-0 font-mono text-sm tracking-wider text-muted">{room.code}</span>
+      {watch && (
+        <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-line-strong px-2.5 py-1 text-xs font-semibold">
+          <Eye className="h-3.5 w-3.5" />
+          Watch
+        </span>
+      )}
+      <span className={cn("shrink-0 font-mono text-sm tracking-wider text-muted", watch && "hidden sm:inline")}>{room.code}</span>
     </>
   );
 
   const classes = "flex min-w-0 flex-1 items-center gap-3.5 px-2 py-3";
   return (
     <li className="flex animate-fade-in items-center gap-1">
-      {joinable ? (
-        <Link href={`/room/${room.code}`} className={cn(classes, "rounded-lg transition hover:bg-white/[0.04]")} aria-label={`Join ${roomTitle(room)}`}>
-          {body}
-        </Link>
-      ) : (
-        <div className={cn(classes, "opacity-50")} aria-disabled="true" title={full ? "This room is full" : "This game is in progress"}>
-          {body}
-        </div>
-      )}
+      <Link
+        href={`/room/${room.code}`}
+        className={cn(classes, "rounded-lg transition hover:bg-white/[0.04]")}
+        aria-label={`${watch ? "Watch" : "Join"} ${roomTitle(room)}`}
+      >
+        {body}
+      </Link>
       <KebabMenu
         items={[
           { label: "Copy code", icon: <Copy />, onSelect: () => copyText(room.code, "Room code copied") },
