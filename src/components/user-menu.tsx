@@ -11,6 +11,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
 import { notifyFailure } from "@/lib/ui/notify";
+import { displayName } from "@/lib/ui/display-name";
 
 export function UserMenu() {
   const { status, profile, user, isGuest, signOut } = useAuth();
@@ -52,7 +53,7 @@ export function UserMenu() {
     );
   }
 
-  const name = profile?.username ?? "…";
+  const name = profile ? displayName(profile) : "…";
 
   async function onSignOut() {
     if (isGuest && !confirming) {

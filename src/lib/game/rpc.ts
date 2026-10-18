@@ -1,6 +1,7 @@
 import type { TypedSupabaseClient } from "@/lib/supabase/client";
 import { toGameError } from "./errors";
-import type { PublicProfile, PublicRoom, RoomMode, RoomSnapshot } from "./types";
+import type { Genre } from "./genres";
+import type { ActiveRoom, PublicProfile, PublicRoom, RoomMode, RoomSnapshot } from "./types";
 
 export type RoomRef = { room_id: string; code: string; version: number };
 export type QuickMatchResult = RoomRef & { created: boolean };
@@ -17,6 +18,7 @@ export type RoomSettings = {
   revealNames?: boolean;
   listenSeconds?: number;
   name?: string;
+  genre?: Genre;
 };
 
 function unwrap<T>({ data, error }: { data: unknown; error: { message: string } | null }): T {
@@ -35,12 +37,13 @@ export async function createRoom(supabase: TypedSupabaseClient, mode: RoomMode, 
       p_name: settings.name,
       p_reveal_names: settings.revealNames,
       p_listen_seconds: settings.listenSeconds,
+      p_genre: settings.genre,
     }),
   );
 }
 
-export async function quickMatch(supabase: TypedSupabaseClient, mode: RoomMode) {
-  return unwrap<QuickMatchResult>(await supabase.rpc("quick_match", { p_mode: mode }));
+export async function quickMatch(supabase: TypedSupabaseClient, mode: RoomMode, genre?: Genre) {
+  return unwrap<QuickMatchResult>(await supabase.rpc("quick_match", { p_mode: mode, p_genre: genre }));
 }
 
 export async function joinRoom(supabase: TypedSupabaseClient, code: string) {
@@ -63,6 +66,50 @@ export type SubmitResult = { submission_id: string; replaced_path: string | null
 
 export async function submitTrack(supabase: TypedSupabaseClient, roomId: string, uploadId: string) {
   return unwrap<SubmitResult>(await supabase.rpc("submit_track", { p_room_id: roomId, p_upload_id: uploadId }));
+}
+
+export type ClipResult = {
+  submission_id: string;
+  clip_start_ms: number;
+  clip_end_ms: number;
+  confirmed: boolean;
+  loudness_boost: boolean;
+};
+
+function clipArgs(roomId: string, startMs: number, endMs: number, peaks: number[] | null, loudnessBoost: boolean | null) {
+  return {
+    p_room_id: roomId,
+    p_clip_start_ms: Math.round(startMs),
+    p_clip_end_ms: Math.round(endMs),
+    p_peaks: peaks,
+    p_loudness_boost: loudnessBoost,
+  };
+}
+
+export async function confirmSubmission(
+  supabase: TypedSupabaseClient,
+  roomId: string,
+  startMs: number,
+  endMs: number,
+  peaks: number[] | null = null,
+  loudnessBoost: boolean | null = null,
+) {
+  return unwrap<ClipResult>(await supabase.rpc("confirm_submission", clipArgs(roomId, startMs, endMs, peaks, loudnessBoost)));
+}
+
+export async function setSubmissionClip(
+  supabase: TypedSupabaseClient,
+  roomId: string,
+  startMs: number,
+  endMs: number,
+  peaks: number[] | null = null,
+  loudnessBoost: boolean | null = null,
+) {
+  return unwrap<ClipResult>(await supabase.rpc("set_submission_clip", clipArgs(roomId, startMs, endMs, peaks, loudnessBoost)));
+}
+
+export async function finishReview(supabase: TypedSupabaseClient, roomId: string) {
+  return unwrap<{ advanced: boolean }>(await supabase.rpc("finish_review", { p_room_id: roomId }));
 }
 
 export async function castVote(supabase: TypedSupabaseClient, roomId: string, submissionId: string, score: number) {
@@ -97,6 +144,7 @@ export async function updateRoomSettings(
       p_mode: changes.mode,
       p_reveal_names: changes.revealNames,
       p_listen_seconds: changes.listenSeconds,
+      p_genre: changes.genre,
     }),
   );
 }
@@ -115,6 +163,10 @@ export async function voteKick(supabase: TypedSupabaseClient, roomId: string, ta
 
 export async function touchRoom(supabase: TypedSupabaseClient, roomId: string) {
   unwrap(await supabase.rpc("touch_room", { p_room_id: roomId }));
+}
+
+export async function roomHeartbeat(supabase: TypedSupabaseClient) {
+  return unwrap<ActiveRoom | null>(await supabase.rpc("room_heartbeat"));
 }
 
 export type UploadKind = "submission" | "avatar";

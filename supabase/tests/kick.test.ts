@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, createUser, rpc, rpcError, submitVerified, type TestDb } from "./harness";
+import { createTestDb, createUser, rpc, rpcError, submitVerified, endReview, type TestDb } from "./harness";
 
 type RoomRef = { room_id: string; code: string };
 type KickResult = { kicked: boolean; votes: number; needed: number };
@@ -244,6 +244,8 @@ describe("mid-game kick", () => {
     const { host, b, c, roomId, sub } = await listening();
     await setOrder(roomId, [sub[host], sub[c], sub[b]], 2);
     await kick(host, roomId, b);
+    expect((await snapshot(host, roomId)).room.status).toBe("reviewing");
+    await endReview(db, roomId);
     const s = await snapshot(host, roomId);
     expect(s.room.status).toBe("results");
     const { rows } = await db.query<{ user_id: string }>("select user_id from public.round_results where room_id = $1", [roomId]);

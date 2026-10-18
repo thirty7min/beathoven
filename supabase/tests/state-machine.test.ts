@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { asUser, createTestDb, createUser, rpc, rpcError, submitVerified, verifiedUpload, type TestDb } from "./harness";
+import { asUser, createTestDb, createUser, rpc, rpcError, submitVerified, verifiedUpload, endReview, type TestDb } from "./harness";
 
 type RoomRef = { room_id: string; code: string; version: number };
 
@@ -281,14 +281,16 @@ describe("lobby", () => {
     expect(await rpcError(db, a, "start_game", { p_room_id: room.room_id })).toBe("wrong_phase");
   });
 
-  it("requires every non-host player to be ready unless forced", async () => {
+  it("requires every player, the host included, to be ready unless forced", async () => {
     const { players, roomId } = await roomWith(3);
     const [host, b, c] = players;
-    expect((await snapshot(host, roomId)).readiness).toEqual({ ready: 1, total: 3, all_ready: false, can_start: false });
+    expect((await snapshot(host, roomId)).readiness).toEqual({ ready: 0, total: 3, all_ready: false, can_start: false });
 
     await rpc(db, b, "set_ready", { p_room_id: roomId, p_ready: true });
     expect(await rpcError(db, host, "start_game", { p_room_id: roomId })).toBe("not_all_ready");
     await rpc(db, c, "set_ready", { p_room_id: roomId, p_ready: true });
+    expect(await rpcError(db, host, "start_game", { p_room_id: roomId })).toBe("not_all_ready");
+    await rpc(db, host, "set_ready", { p_room_id: roomId, p_ready: true });
     expect((await snapshot(host, roomId)).readiness).toEqual({ ready: 3, total: 3, all_ready: true, can_start: true });
     await rpc(db, host, "start_game", { p_room_id: roomId });
     expect((await snapshot(host, roomId)).room.status).toBe("producing");
@@ -413,8 +415,8 @@ describe("producing", () => {
     });
     expect(second).toEqual({ submission_id: first, replaced_path: firstPath });
     const mine = await snapshot(players[0], roomId);
-    expect(mine.my_submission).toMatchObject({ id: first, storage_path: finalPath, duration_ms: 90000 });
-    expect(mine.submitted_user_ids).toEqual([players[0]]);
+    expect(mine.my_submission).toMatchObject({ id: first, storage_path: finalPath, duration_ms: 90000, confirmed: false });
+    expect(mine.submitted_user_ids).toEqual([]);
     const { rows } = await db.query("select id from public.submissions");
     expect(rows).toHaveLength(1);
   });
@@ -567,6 +569,8 @@ describe("listening and voting", () => {
     expect((await snapshot(players[0], roomId)).room.current_track).toBe(1);
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });
+    expect((await snapshot(players[0], roomId)).room.status).toBe("reviewing");
+    await endReview(db, roomId);
     expect((await snapshot(players[0], roomId)).room.status).toBe("results");
   });
 
@@ -610,6 +614,7 @@ describe("results", () => {
       await finishTrackPlayback(roomId);
       await rpc(db, a, "advance_room", { p_room_id: roomId });
     }
+    await endReview(db, roomId);
 
     const s = await snapshot(a, roomId);
     expect(s.room.status).toBe("results");
@@ -657,6 +662,7 @@ describe("results", () => {
       await finishTrackPlayback(roomId);
       await rpc(db, a, "advance_room", { p_room_id: roomId });
     }
+    await endReview(db, roomId);
     const { rows } = await db.query<{ id: string; wins: number }>("select id, wins from public.profiles");
     expect(rows.find((r) => r.id === a)!.wins).toBe(1);
     expect(rows.find((r) => r.id === b)!.wins).toBe(0);
@@ -694,11 +700,11 @@ describe("realtime", () => {
     await submit(players[1], roomId);
     const states = await broadcasts(roomId, "room_state");
     const versions = states.map((s) => s.version);
-    expect(versions).toEqual([2, 3, 4, 5]);
+    expect(versions).toEqual([2, 3, 4, 5, 6, 7]);
     const last = states.at(-1) as unknown as State;
     expect(last.room.status).toBe("listening");
     expect(last).not.toHaveProperty("my_votes");
-    expect((await snapshot(players[0], roomId)).version).toBe(5);
+    expect((await snapshot(players[0], roomId)).version).toBe(7);
   });
 
   it("broadcasts only the committed state when a transaction bumps twice", async () => {
@@ -924,12 +930,12 @@ describe("public lobby list", () => {
 
     const cooking = byId[producing.roomId];
     expect(cooking).toMatchObject({ name: "Cooking", status: "producing", round: 1, player_count: 3, joinable: false });
-    const assumed = 3 * (3 + 45) + 30;
+    const assumed = 3 * (3 + 45) + 60;
     expect(Date.parse(cooking.estimated_end_at!) - Date.parse(cooking.phase_ends_at!)).toBe(assumed * 1000);
 
     const live = byId[listening.roomId];
     expect(live.status).toBe("listening");
-    expect(Date.parse(live.estimated_end_at!) - Date.parse(live.phase_ends_at!)).toBe((30 + 3 + 45) * 1000);
+    expect(Date.parse(live.estimated_end_at!) - Date.parse(live.phase_ends_at!)).toBe((60 + 3 + 45) * 1000);
   });
 });
 
@@ -1045,6 +1051,7 @@ describe("get_profile", () => {
       await finishTrackPlayback(roomId);
       await rpc(db, a, "advance_room", { p_room_id: roomId });
     }
+    await endReview(db, roomId);
     return { a, b, roomId };
   }
 
@@ -1066,7 +1073,7 @@ describe("get_profile", () => {
     const result = await asAnon<Profile>("get_profile", [rows[0].username.toUpperCase()]);
 
     expect(Object.keys(result.profile).sort()).toEqual(
-      ["avatar_url", "bio", "created_at", "daws", "games_played", "id", "link_url", "ties", "username", "wins"].sort(),
+      ["avatar_url", "bio", "created_at", "daws", "display_name", "games_played", "id", "link_url", "ties", "username", "wins"].sort(),
     );
     expect(result.profile).toMatchObject({ id: a, wins: 1, ties: 0, games_played: 1 });
     expect(result.recent_results).toHaveLength(1);
@@ -1288,6 +1295,7 @@ describe("blind listening and reveal_names", () => {
       await expirePhase(roomId);
       await rpc(db, players[0], "advance_room", { p_room_id: roomId });
     }
+    await endReview(db, roomId);
     const s = await snapshot(players[1], roomId);
     expect(s.room.status).toBe("results");
     expect(s.submissions.map((x) => x.user_id).sort()).toEqual([...players].sort());
@@ -1380,31 +1388,33 @@ describe("skip", () => {
     const s = await snapshot(players[0], roomId);
     const owner = await ownerOf(currentTrack(s));
     const [first] = players.filter((p) => p !== owner);
-    expect(await rpcError(db, owner, "skip_track", { p_room_id: roomId })).toBe("cannot_skip_own");
     expect(await rpcError(db, outsider, "skip_track", { p_room_id: roomId })).toBe("not_member");
 
-    expect(await skip(first, roomId)).toEqual({ skipped: false, votes: 1, needed: 2 });
+    expect(await skip(first, roomId)).toEqual({ skipped: false, votes: 1, needed: 3 });
     const version = (await snapshot(first, roomId)).version;
-    expect(await skip(first, roomId)).toEqual({ skipped: false, votes: 1, needed: 2 });
+    expect(await skip(first, roomId)).toEqual({ skipped: false, votes: 1, needed: 3 });
     const after = await snapshot(first, roomId);
     expect(after.version).toBe(version);
-    expect(after.skip).toEqual({ submission_id: currentTrack(s), votes: 1, needed: 2, you_voted: true });
+    expect(after.skip).toEqual({ submission_id: currentTrack(s), votes: 1, needed: 3, you_voted: true });
     expect((await snapshot(owner, roomId)).skip!.you_voted).toBe(false);
     const payload = (await broadcasts(roomId, "room_state")).at(-1) as unknown as State;
-    expect(payload.skip).toEqual({ submission_id: currentTrack(s), votes: 1, needed: 2 });
+    expect(payload.skip).toEqual({ submission_id: currentTrack(s), votes: 1, needed: 3 });
+    expect(await skip(owner, roomId)).toEqual({ skipped: false, votes: 2, needed: 3 });
   });
 
   it.each([
-    [2, 1],
+    [2, 2],
     [3, 2],
-    [4, 2],
+    [4, 3],
     [5, 3],
-  ])("with %i players it takes %i skip votes", async (n, needed) => {
-    const { players, roomId } = await gameRoom(n);
+    [10, 6],
+  ])("with %i players it takes a majority of %i skip votes, the producer's included", async (n, needed) => {
+    const { players, roomId } = await gameRoom(n, { p_max_players: 16 });
     const s = await snapshot(players[0], roomId);
+    expect(s.skip!.needed).toBe(needed);
     const track = currentTrack(s);
     const owner = await ownerOf(track);
-    const skippers = players.filter((p) => p !== owner);
+    const skippers = [owner, ...players.filter((p) => p !== owner)];
     for (let i = 0; i < needed - 1; i++) {
       expect((await skip(skippers[i], roomId)).skipped).toBe(false);
       expect((await snapshot(players[0], roomId)).room.current_track).toBe(0);
@@ -1426,11 +1436,15 @@ describe("skip", () => {
       await beginPlayback(roomId);
       await db.query("update public.rooms set phase_ends_at = now() + interval '1 minute' where id = $1", [roomId]);
       await rpc(db, other, "cast_vote", { p_room_id: roomId, p_submission_id: track, p_score: 4 }).catch(() => undefined);
-      if ((await snapshot(a, roomId)).room.current_track === i) await skip(other, roomId);
+      if ((await snapshot(a, roomId)).room.current_track === i) {
+        await skip(other, roomId);
+        await skip(owner, roomId);
+      }
     }
     expect((await snapshot(a, roomId)).room.status).toBe("listening");
     await expirePhase(roomId);
     await rpc(db, a, "advance_room", { p_room_id: roomId });
+    await endReview(db, roomId);
     const s = await snapshot(a, roomId);
     expect(s.room.status).toBe("results");
     expect(s.results.map((r) => r.vote_count)).toEqual([1, 1]);
@@ -1477,6 +1491,7 @@ describe("member freshness", () => {
 
   it("counts only fresh members for readiness and start", async () => {
     const { players, roomId } = await roomWith(3);
+    await rpc(db, players[0], "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, players[1], "set_ready", { p_room_id: roomId, p_ready: true });
     await makeStale(roomId, players[2]);
     expect((await snapshot(players[0], roomId)).readiness).toEqual({ ready: 2, total: 2, all_ready: true, can_start: true });
@@ -1598,7 +1613,7 @@ describe("premade window", () => {
     const listed = (await rpc<{ id: string; estimated_end_at: string }[]>(db, viewer, "list_public_rooms")).find(
       (r) => r.id === roomId,
     )!;
-    const expected = 180 + 15 + 3 * (3 + 45) + 30;
+    const expected = 180 + 15 + 3 * (3 + 45) + 60;
     expect((Date.parse(listed.estimated_end_at) - Date.now()) / 1000).toBeCloseTo(expected, 0);
   });
 
@@ -1692,6 +1707,8 @@ describe("auto votes", () => {
     await rpc(db, voter, "cast_vote", { p_room_id: roomId, p_submission_id: last, p_score: 1 });
     await expirePhase(roomId);
     await advance(owner, roomId);
+    expect((await snapshot(owner, roomId)).room.status).toBe("reviewing");
+    await endReview(db, roomId);
     const done = await snapshot(owner, roomId);
     expect(done.room.status).toBe("results");
     expect(done.results.find((r) => r.user_id === owner)).toMatchObject({ avg_score: 1, vote_count: 1 });

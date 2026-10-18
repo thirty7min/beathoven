@@ -1,7 +1,17 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
+import { networkInterfaces } from "node:os";
 import { version } from "./package.json";
 
-const nextConfig: NextConfig = {
+function lanAddresses() {
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((entry) => entry?.family === "IPv4" && !entry.internal)
+    .map((entry) => entry!.address);
+}
+
+const nextConfig = (phase: string): NextConfig => ({
+  allowedDevOrigins: phase === PHASE_DEVELOPMENT_SERVER ? lanAddresses() : [],
   cacheComponents: true,
   partialPrefetching: true,
   outputFileTracingIncludes: {
@@ -19,6 +29,6 @@ const nextConfig: NextConfig = {
       },
     },
   },
-};
+});
 
 export default nextConfig;

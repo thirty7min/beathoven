@@ -2,7 +2,8 @@
 
 import { MessageSquare, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Tabs } from "@/components/ui/tabs";
+import { cn } from "@/components/ui/cn";
+import { TabPanels, Tabs } from "@/components/ui/tabs";
 import { activePlayers } from "@/lib/game/lobby";
 import type { RoomSnapshot } from "@/lib/game/types";
 import { ChatPanel } from "./chat-panel";
@@ -10,16 +11,16 @@ import { PlayerList } from "./player-list";
 
 type Props = {
   snapshot: RoomSnapshot;
-  online: string[];
   onSend: (body: string) => Promise<unknown>;
   now: number | null;
+  glass: boolean;
   onKick: (userId: string) => Promise<unknown>;
   onVoteKick: (userId: string) => void;
 };
 
 type Tab = "chat" | "players";
 
-export function MobileDock({ snapshot, online, onSend, now, onKick, onVoteKick }: Props) {
+export function MobileDock({ snapshot, onSend, now, glass, onKick, onVoteKick }: Props) {
   const [open, setOpen] = useState<Tab | null>(null);
   const latestId = snapshot.chat.at(-1)?.id ?? 0;
   const [seen, setSeen] = useState(latestId);
@@ -44,12 +45,17 @@ export function MobileDock({ snapshot, online, onSend, now, onKick, onVoteKick }
 
   return (
     <div className="lg:hidden">
-      <div className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t border-line bg-page/95 p-3 backdrop-blur-md">
-        <button onClick={() => show("players")} className="flex h-11 items-center justify-center gap-2 rounded-full bg-raised text-sm font-semibold">
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 gap-2 border-t border-line p-3 transition-[background-color] duration-200 ease-snappy",
+          glass ? "bg-black/50 backdrop-blur-lg" : "bg-page/95 backdrop-blur-md",
+        )}
+      >
+        <button onClick={() => show("players")} className={cn("flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold", dockButton(glass))}>
           <Users className="h-4 w-4 text-muted" />
           Players <span className="text-muted tabular-nums">{count}</span>
         </button>
-        <button onClick={() => show("chat")} className="relative flex h-11 items-center justify-center gap-2 rounded-full bg-raised text-sm font-semibold">
+        <button onClick={() => show("chat")} className={cn("relative flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold", dockButton(glass))}>
           <MessageSquare className="h-4 w-4 text-muted" />
           Chat
           {unread > 0 && (
@@ -62,8 +68,13 @@ export function MobileDock({ snapshot, online, onSend, now, onKick, onVoteKick }
 
       {open && (
         <div className="fixed inset-0 z-40 flex flex-col justify-end">
-          <button aria-label="Close" className="absolute inset-0 bg-black/70" onClick={() => show(null)} />
-          <div role="dialog" aria-modal="true" aria-label={open === "chat" ? "Chat" : "Players"} className="relative flex h-[80dvh] animate-sheet flex-col rounded-t-2xl border-t border-line bg-surface">
+          <button aria-label="Close" className={cn("absolute inset-0", glass ? "bg-black/40" : "bg-black/70")} onClick={() => show(null)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={open === "chat" ? "Chat" : "Players"}
+            className={cn("relative flex h-[80dvh] animate-sheet flex-col rounded-t-2xl border-t border-line", glass ? "bg-black/55 backdrop-blur-lg" : "bg-surface")}
+          >
             <div className="flex items-center gap-4 px-5 pt-3">
               <Tabs
                 label="Room panel"
@@ -79,14 +90,30 @@ export function MobileDock({ snapshot, online, onSend, now, onKick, onVoteKick }
                 <X className="h-5 w-5" />
               </button>
             </div>
-            {open === "players" ? (
-              <PlayerList snapshot={snapshot} online={online} className="min-h-0 flex-1 px-5 py-2" now={now} onKick={onKick} onVoteKick={onVoteKick} />
-            ) : (
-              <ChatPanel messages={snapshot.chat} me={snapshot.me} hostId={snapshot.room.host_id} players={snapshot.players} online={online} onSend={onSend} className="min-h-0 flex-1" />
-            )}
+            <TabPanels
+              active={open}
+              className="min-h-0 flex-1 grid-rows-[minmax(0,1fr)]"
+              panelClassName="flex min-h-0 flex-col"
+              panels={[
+                {
+                  id: "players",
+                  content: <PlayerList snapshot={snapshot} className="min-h-0 flex-1 px-5 py-2" now={now} onKick={onKick} onVoteKick={onVoteKick} />,
+                },
+                {
+                  id: "chat",
+                  content: (
+                    <ChatPanel messages={snapshot.chat} me={snapshot.me} hostId={snapshot.room.host_id} players={snapshot.players} onSend={onSend} glass={glass} className="min-h-0 flex-1" />
+                  ),
+                },
+              ]}
+            />
           </div>
         </div>
       )}
     </div>
   );
+}
+
+function dockButton(glass: boolean) {
+  return cn("transition-[background-color] duration-200 ease-snappy", glass ? "bg-white/[0.08]" : "bg-raised");
 }

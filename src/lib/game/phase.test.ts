@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  REVIEW_MS,
   UPLOAD_GRACE_MS,
+  AUTOSTART_SECONDS,
   advanceDueAt,
+  autostartRemainingMs,
   cappedRemaining,
   clipMs,
   formatCountdown,
@@ -58,6 +61,13 @@ describe("phaseCountdown", () => {
     expect(phaseCountdown(room({}), [], T0)).toBeNull();
   });
 
+  it("counts down the 30 second review", () => {
+    const r = room({ status: "reviewing", phase_ends_at: iso(T0 + 30_000) });
+    expect(phaseCountdown(r, [], T0 + 10_000)).toEqual({ label: "review", endsAt: T0 + 30_000, remainingMs: 20_000 });
+    expect(phaseCountdown(r, [], T0 - 1_000)!.remainingMs).toBe(REVIEW_MS);
+    expect(advanceDueAt(r)).toBe(T0 + 30_000);
+  });
+
   it("splits producing into produce time then upload grace", () => {
     const r = room({ status: "producing", phase_ends_at: iso(T0 + 600_000 + UPLOAD_GRACE_MS) });
     expect(phaseCountdown(r, [], T0)).toEqual({ label: "produce", endsAt: T0 + 600_000, remainingMs: 600_000 });
@@ -104,15 +114,28 @@ describe("playbackPosition", () => {
   const r = room({ status: "listening", track_order: ["s1"], current_track: 0, track_started_at: iso(T0) });
 
   it("reports pending, playing at offset, then ended", () => {
-    expect(playbackPosition(r, [submission], T0 - 2500)).toEqual({ state: "pending", submission, clipMs: 60_000, startsInMs: 2500 });
-    expect(playbackPosition(r, [submission], T0 + 12_345)).toEqual({ state: "playing", submission, clipMs: 60_000, offsetMs: 12_345 });
-    expect(playbackPosition(r, [submission], T0 + 60_000)).toEqual({ state: "ended", submission, clipMs: 60_000 });
+    expect(playbackPosition(r, [submission], T0 - 2500)).toEqual({ state: "pending", submission, clipStartMs: 0, clipMs: 60_000, startsInMs: 2500 });
+    expect(playbackPosition(r, [submission], T0 + 12_345)).toEqual({ state: "playing", submission, clipStartMs: 0, clipMs: 60_000, offsetMs: 12_345 });
+    expect(playbackPosition(r, [submission], T0 + 60_000)).toEqual({ state: "ended", submission, clipStartMs: 0, clipMs: 60_000 });
   });
 
   it("ends at the room's listen limit", () => {
     const limited = { ...r, listen_seconds: 45 };
     expect(playbackPosition(limited, [submission], T0 + 44_000)).toMatchObject({ state: "playing", clipMs: 45_000 });
-    expect(playbackPosition(limited, [submission], T0 + 45_000)).toEqual({ state: "ended", submission, clipMs: 45_000 });
+    expect(playbackPosition(limited, [submission], T0 + 45_000)).toEqual({ state: "ended", submission, clipStartMs: 0, clipMs: 45_000 });
+  });
+
+  it("plays the chosen clip from its start offset", () => {
+    const clipped = { ...submission, clip_start_ms: 20_000, clip_end_ms: 32_000 };
+    const limited = { ...r, listen_seconds: 45 };
+    expect(playbackPosition(limited, [clipped], T0 + 5_000)).toEqual({
+      state: "playing",
+      submission: clipped,
+      clipStartMs: 20_000,
+      clipMs: 12_000,
+      offsetMs: 5_000,
+    });
+    expect(playbackPosition(limited, [clipped], T0 + 12_000)).toMatchObject({ state: "ended", clipStartMs: 20_000 });
   });
 
   it("is idle outside listening or when the submission is unknown", () => {
@@ -127,6 +150,12 @@ describe("clipMs", () => {
     expect(clipMs(45, { duration_ms: 20_000 })).toBe(20_000);
   });
 
+  it("uses the chosen clip, still capped at the listen limit", () => {
+    expect(clipMs(45, { ...submission, clip_start_ms: 10_000, clip_end_ms: 40_000 })).toBe(30_000);
+    expect(clipMs(30, { ...submission, clip_start_ms: 0, clip_end_ms: 45_000 })).toBe(30_000);
+    expect(clipMs(45, { ...submission, clip_start_ms: 50_000 })).toBe(0);
+  });
+
   it("plays the whole track when the room has no limit", () => {
     expect(clipMs(undefined, submission)).toBe(60_000);
     expect(clipMs(null, submission)).toBe(60_000);
@@ -137,7 +166,19 @@ describe("advanceDueAt", () => {
   it("is the phase deadline for timed phases only", () => {
     expect(advanceDueAt(room({ status: "producing", phase_ends_at: iso(T0) }))).toBe(T0);
     expect(advanceDueAt(room({ status: "lobby" }))).toBeNull();
+    expect(advanceDueAt(room({ status: "lobby", autostart_at: iso(T0 + 5_000) }))).toBe(T0 + 5_000);
     expect(advanceDueAt(room({ status: "closed", phase_ends_at: iso(T0) }))).toBeNull();
+  });
+});
+
+describe("autostartRemainingMs", () => {
+  it("counts down to the auto-start in the lobby only, capped at the countdown length", () => {
+    const r = room({ status: "lobby", autostart_at: iso(T0 + 5_000) });
+    expect(autostartRemainingMs(r, T0 + 1_500)).toBe(3_500);
+    expect(autostartRemainingMs(r, T0 - 400)).toBe(AUTOSTART_SECONDS * 1000);
+    expect(autostartRemainingMs(r, T0 + 9_000)).toBe(0);
+    expect(autostartRemainingMs(room({ status: "lobby" }), T0)).toBeNull();
+    expect(autostartRemainingMs({ ...r, status: "producing" }, T0)).toBeNull();
   });
 });
 

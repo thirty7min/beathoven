@@ -4,6 +4,7 @@ import { Copy, Link2, Users } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { GenreBadge } from "@/components/genre-badge";
 import { ModeBadge } from "@/components/mode-badge";
 import { Badge } from "@/components/ui/badge";
 import { Eyebrow } from "@/components/ui/card";
@@ -75,13 +76,14 @@ function RoomRow({ room, now }: { room: PublicRoom; now: number | null }) {
         <span className="truncate text-[15px] font-semibold">{roomTitle(room)}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
           <span className="flex items-center gap-1">
-            {room.host_username ?? "No host"} ·
+            {room.host_display_name ?? room.host_username ?? "No host"} ·
             <Users className="h-3 w-3" />
             <span className="tabular-nums">
               {room.player_count}/{room.max_players}
             </span>
           </span>
           <ModeBadge room={room} className="" />
+          <GenreBadge genre={room.genre} />
           {full && <Badge>Full</Badge>}
           {phase && <span className="tabular-nums">{phase}</span>}
           {eta && <span>· {eta}</span>}

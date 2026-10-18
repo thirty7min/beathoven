@@ -1,8 +1,9 @@
 "use client";
 
-import { Bot, Check, ChevronDown, ChevronUp, Copy, Info, Link2, LogOut, Settings } from "lucide-react";
+import { Bot, Check, ChevronDown, ChevronUp, Copy, Info, Link2, LogOut, Settings, X } from "lucide-react";
 import { useState } from "react";
 import { RoomSettingsForm, RoomSettingsSummary, type RoomSettingsDraft } from "@/components/home/room-settings-form";
+import { GenreBadge } from "@/components/genre-badge";
 import { ModeBadge } from "@/components/mode-badge";
 import { Button } from "@/components/ui/button";
 import { Card, Eyebrow } from "@/components/ui/card";
@@ -11,6 +12,8 @@ import { Dialog } from "@/components/ui/dialog";
 import { useDevToolsEnabled } from "@/hooks/use-dev-tools";
 import { addBot, removeBot } from "@/lib/game/dev-bots";
 import { activePlayers, readyCount, startCheck } from "@/lib/game/lobby";
+import { DEFAULT_GENRE } from "@/lib/game/genres";
+import { autostartRemainingMs } from "@/lib/game/phase";
 import { DEFAULT_SETTINGS, hasCustomRules } from "@/lib/game/room-settings";
 import type { Room } from "@/lib/game/types";
 import { ChatPanel } from "./chat-panel";
@@ -20,6 +23,8 @@ import type { RoomController } from "./types";
 import { useCopy } from "./use-copy";
 import { useKickActions } from "./use-kick-actions";
 import { useRoomAction } from "./use-room-action";
+import { autostartView, type AutostartView } from "@/lib/ui/autostart";
+import { displayName } from "@/lib/ui/display-name";
 
 export function LobbyView({
   room,
@@ -45,10 +50,18 @@ export function LobbyView({
   const kick = useKickActions(state.id);
   const meReady = snapshot.players.find((p) => p.user_id === me)?.is_ready ?? false;
   const check = startCheck(snapshot, room.connection === "live");
-  const { ready, total } = snapshot.readiness ?? readyCount(snapshot.players, state.host_id);
+  const { ready, total } = readyCount(snapshot.players);
   const players = activePlayers(snapshot.players);
   const custom = hasCustomRules(state);
   const quietConnection = room.connection === "live" || room.connection === "connecting";
+  const countdown = autostartView(serverNow === null ? null : autostartRemainingMs(state, serverNow));
+  const counting = countdown !== null;
+  const [wasCounting, setWasCounting] = useState(counting);
+  const [cancelNotice, setCancelNotice] = useState(false);
+  if (counting !== wasCounting) {
+    setWasCounting(counting);
+    setCancelNotice(!counting);
+  }
 
   async function start(force: boolean) {
     await run(force ? "force" : "start", () => room.actions.startGame({ force }));
@@ -64,6 +77,7 @@ export function LobbyView({
         <div className="flex min-w-0 items-center gap-2.5">
           <h1 className="truncate text-xl font-bold tracking-tight">{state.name || `Room ${state.code}`}</h1>
           <ModeBadge room={state} />
+          <GenreBadge genre={state.genre} />
           {custom && (
             <button
               onClick={() => setDetailsOpen(true)}
@@ -119,53 +133,61 @@ export function LobbyView({
           </div>
           <PlayerList
             snapshot={snapshot}
-            online={room.online}
             className="flex-1 px-5"
             now={serverNow}
             {...kick}
             onRemoveBot={devTools ? (botId) => void run("remove-bot", () => removeBot(state.id, botId)) : undefined}
           />
           <div className="flex flex-col gap-2 border-t border-line p-4">
+            {countdown ? (
+              <AutostartBanner key="countdown" countdown={countdown} />
+            ) : (
+              cancelNotice && (
+                <p key="cancelled" role="status" onAnimationEnd={() => setCancelNotice(false)} className="animate-notice pb-1 text-center text-sm text-muted">
+                  Start cancelled
+                </p>
+              )
+            )}
             <div className="flex gap-3">
               <Button variant="outline" size="lg" onClick={onLeave} loading={leaving} className="px-4" aria-label="Leave room">
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Leave room</span>
               </Button>
-              {isHost ? (
-                check.kind === "force" ? (
-                  <Button variant="primary" size="lg" className="flex-1" onClick={() => setConfirmForce(true)}>
-                    Force start
-                  </Button>
+              <Button
+                variant={isHost || (meReady && !counting) ? "outline" : "primary"}
+                size="lg"
+                className={cn(!isHost && "flex-1", counting && meReady && isHost && "border-fg")}
+                aria-pressed={meReady}
+                loading={pending === "ready"}
+                onClick={() => run("ready", () => room.actions.setReady(!meReady))}
+              >
+                {counting && meReady ? (
+                  <>
+                    <X className="h-4 w-4" />
+                    Unready
+                  </>
+                ) : meReady ? (
+                  <>
+                    Ready <Check className="h-4 w-4" />
+                  </>
                 ) : (
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="flex-1"
-                    disabled={check.kind !== "ready"}
-                    loading={pending === "start"}
-                    onClick={() => start(false)}
-                  >
+                  "Ready up"
+                )}
+              </Button>
+              {isHost &&
+                (counting ? (
+                  <Button variant="primary" size="lg" className="flex-1" loading={pending === "start" || pending === "force"} onClick={() => start(check.kind !== "ready")}>
+                    Start now
+                  </Button>
+                ) : check.kind === "ready" ? (
+                  <Button variant="primary" size="lg" className="flex-1" loading={pending === "start"} onClick={() => start(false)}>
                     Start
                   </Button>
-                )
-              ) : (
-                <Button
-                  variant={meReady ? "outline" : "primary"}
-                  size="lg"
-                  className="flex-1"
-                  aria-pressed={meReady}
-                  loading={pending === "ready"}
-                  onClick={() => run("ready", () => room.actions.setReady(!meReady))}
-                >
-                  {meReady ? (
-                    <>
-                      Ready <Check className="h-4 w-4" />
-                    </>
-                  ) : (
-                    "Ready up"
-                  )}
-                </Button>
-              )}
+                ) : (
+                  <Button variant="primary" size="lg" className="flex-1" disabled={check.kind !== "force"} onClick={() => setConfirmForce(true)}>
+                    Force start
+                  </Button>
+                ))}
             </div>
             <p className="text-right text-[11px] font-semibold tracking-[0.08em] text-muted uppercase tabular-nums">{caption}</p>
           </div>
@@ -186,7 +208,7 @@ export function LobbyView({
           {chatCollapsed ? (
             <div className="pb-3" />
           ) : (
-            <ChatPanel messages={snapshot.chat} me={me} hostId={state.host_id} players={snapshot.players} online={room.online} onSend={room.actions.sendChat} className="min-h-0 flex-1" />
+            <ChatPanel messages={snapshot.chat} me={me} hostId={state.host_id} players={snapshot.players} onSend={room.actions.sendChat} className="min-h-0 flex-1" />
           )}
         </Card>
       </div>
@@ -196,15 +218,17 @@ export function LobbyView({
           <SettingsDialog
             room={state}
             minPlayers={players.length}
-            hostName={players.find((p) => p.user_id === me)?.username} onClose={() => setDetailsOpen(false)} onSave={room.actions.updateSettings} />
+            hostName={displayName(players.find((p) => p.user_id === me), "")} onClose={() => setDetailsOpen(false)} onSave={room.actions.updateSettings} />
         ) : (
           <DetailsDialog room={state} onClose={() => setDetailsOpen(false)} />
         ))}
 
-      <Dialog open={confirmForce} onClose={() => setConfirmForce(false)} title="Start without everyone?">
+      <Dialog open={confirmForce} onClose={() => setConfirmForce(false)} title="Start without everyone ready?">
         <p className="text-sm text-muted">
-          {check.kind === "force" ? check.waitingFor : 0} {check.kind === "force" && check.waitingFor === 1 ? "player isn't" : "players aren't"}{" "}
-          ready yet. They&apos;ll still be in the game, but the clock starts now.
+          <span className="font-semibold text-fg tabular-nums">
+            {ready}/{total} ready.
+          </span>{" "}
+          Anyone who isn&apos;t ready still plays, but the clock starts now.
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setConfirmForce(false)}>
@@ -248,6 +272,7 @@ function SettingsDialog({
   const [draft, setDraft] = useState<RoomSettingsDraft>({
     mode: room.mode,
     name: room.name ?? "",
+    genre: room.genre ?? DEFAULT_GENRE,
     maxPlayers: room.max_players,
     produceSeconds: room.produce_seconds,
     listenSeconds: room.listen_seconds ?? DEFAULT_SETTINGS.listenSeconds,
@@ -270,6 +295,7 @@ function SettingsDialog({
           value={draft}
           onChange={setDraft}
           minPlayers={minPlayers}
+          autoFocusName
           namePlaceholder={hostName ? `${hostName}'s room` : undefined}
         />
         <p className="text-xs text-muted">Changing the mode or timers resets everyone&apos;s ready state.</p>
@@ -283,5 +309,24 @@ function SettingsDialog({
         </div>
       </div>
     </Dialog>
+  );
+}
+
+function AutostartBanner({ countdown }: { countdown: AutostartView }) {
+  return (
+    <div role="timer" aria-live="polite" aria-atomic className="flex animate-swap items-center rounded-xl border border-line-strong bg-raised px-4 py-3">
+      <span className="flex min-w-0 flex-1 flex-col gap-2">
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="text-sm font-semibold">Starting in {countdown.seconds}…</span>
+          <span className="text-xs text-muted">Unready to cancel</span>
+        </span>
+        <span className="h-1 overflow-hidden rounded-full bg-white/10">
+          <span
+            className="block h-full origin-left rounded-full bg-fg transition-transform duration-250 ease-linear motion-reduce:transition-none"
+            style={{ transform: `scaleX(${countdown.fraction})` }}
+          />
+        </span>
+      </span>
+    </div>
   );
 }

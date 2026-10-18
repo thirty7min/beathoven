@@ -11,21 +11,15 @@ import { cn } from "@/components/ui/cn";
 import { List, ListRow } from "@/components/ui/list";
 import { formatClock } from "@/lib/game/format";
 import { kickActionFor, kickVoteFor } from "@/lib/game/kick";
-import { activePlayers, playerPhaseStatus } from "@/lib/game/lobby";
-import { submitPhaseCopy } from "@/lib/game/phase-label";
+import { activePlayers, hasSubmitted, memberBadge } from "@/lib/game/lobby";
 import { currentSubmission } from "@/lib/game/phase";
 import { revealedProducer } from "@/lib/game/room-extras";
 import type { RoomPlayer, RoomSnapshot } from "@/lib/game/types";
 import { ProfileCard } from "./profile-card";
-
-const DONE_LABEL: Partial<Record<RoomSnapshot["room"]["status"], string>> = {
-  lobby: "Ready",
-  producing: "Submitted",
-};
+import { displayName } from "@/lib/ui/display-name";
 
 export function PlayerList({
   snapshot,
-  online,
   className,
   now,
   onRemoveBot,
@@ -33,7 +27,6 @@ export function PlayerList({
   onVoteKick,
 }: {
   snapshot: RoomSnapshot;
-  online: string[];
   className?: string;
   now?: number | null;
   onRemoveBot?: (userId: string) => void;
@@ -44,17 +37,14 @@ export function PlayerList({
   const [kicking, setKicking] = useState<RoomPlayer | null>(null);
   const [kickBusy, setKickBusy] = useState(false);
   const players = activePlayers(snapshot.players);
-  const onlineSet = new Set(online);
-  const presenceKnown = online.length > 0;
-  const { status } = snapshot.room;
   const playingId = revealedProducer(snapshot, currentSubmission(snapshot.room, snapshot.submissions))?.user_id ?? null;
 
   return (
     <section className={cn("flex min-h-0 flex-col", className)} aria-label="Players">
-      <List className="scrollbar-thin min-h-0 overflow-y-auto">
+      <List className="scrollbar-thin -mx-1 min-h-0 overflow-y-auto px-1">
         {players.map((player) => {
-          const isOnline = player.is_bot === true || onlineSet.has(player.user_id) || (!presenceKnown && player.user_id === snapshot.me);
-          const phase = DONE_LABEL[status] ? playerPhaseStatus(snapshot, player.user_id) : null;
+          const badge = memberBadge(snapshot, player.user_id, playingId);
+          const submitted = hasSubmitted(snapshot, player.user_id);
           const isHost = snapshot.room.host_id === player.user_id;
           const vote = kickVoteFor(snapshot, player.user_id);
           const voteLeftMs = vote && now != null ? Math.max(0, Date.parse(vote.expires_at) - now) : null;
@@ -73,22 +63,24 @@ export function PlayerList({
               className="grid-cols-[minmax(0,1fr)_auto] px-0 py-2.5"
               onClick={() => setSelected(player)}
               thumb={
-                <span className="relative">
-                  <Avatar name={player.username} url={player.avatar_url} seed={player.user_id} size="md" className={cn(!isOnline && "opacity-40")} />
-                  <span
-                    aria-label={isOnline ? "online" : "away"}
-                    className={cn("absolute -right-1 -bottom-1 h-3 w-3 rounded-full border-2 border-surface", isOnline ? "bg-online" : "bg-subtle")}
-                  />
+                <span className="relative inline-flex">
+                  <Avatar name={displayName(player)} url={player.avatar_url} seed={player.user_id} size="md" />
+                  {submitted && (
+                    <span
+                      role="img"
+                      aria-label="Submitted"
+                      className="animate-ring pointer-events-none absolute -inset-1 rounded-full border-2 border-online"
+                    />
+                  )}
                 </span>
               }
               title={
                 <>
-                  <span className={cn("truncate text-sm", !isOnline && "text-muted")}>{player.username}</span>
+                  <span className="truncate text-sm">{displayName(player)}</span>
                   {player.user_id === snapshot.me && <Badge tone="outline">You</Badge>}
                   {player.is_bot && <Badge>Bot</Badge>}
                 </>
               }
-              subtitle={isOnline ? undefined : "Away"}
               trailing={
                 <span className="flex items-center gap-2">
                   {vote && (
@@ -97,18 +89,16 @@ export function PlayerList({
                       {voteLeftMs !== null && ` · ${formatClock(voteLeftMs)}`}
                     </span>
                   )}
-                  {player.user_id === playingId ? (
+                  {badge === "playing" ? (
                     <Badge tone="solid">
                       <AudioLines />
-                      Playing
+                      <span className="sr-only">Playing</span>
                     </Badge>
-                  ) : isHost && status === "lobby" ? null : phase === "done" ? (
-                    <Badge tone="outline">
+                  ) : badge === "ready" ? (
+                    <Badge tone="outline" className="animate-swap">
                       <Check />
-                      {DONE_LABEL[status]}
+                      Ready
                     </Badge>
-                  ) : phase === "waiting" && status === "producing" ? (
-                    <span className="text-xs text-subtle">{submitPhaseCopy(snapshot.room.mode).waiting}</span>
                   ) : null}
                   {isHost && (
                     <Badge tone="solid">
@@ -119,20 +109,20 @@ export function PlayerList({
                   {player.is_bot && onRemoveBot && menu.length === 0 && (
                     <button
                       onClick={() => onRemoveBot(player.user_id)}
-                      aria-label={`Remove ${player.username}`}
+                      aria-label={`Remove ${displayName(player)}`}
                       className="rounded-full p-1 text-subtle transition hover:bg-white/[0.06] hover:text-fg"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   )}
-                  {menu.length > 0 && <KebabMenu items={menu} label={`Actions for ${player.username}`} />}
+                  {menu.length > 0 && <KebabMenu items={menu} label={`Actions for ${displayName(player)}`} />}
                 </span>
               }
             />
           );
         })}
       </List>
-      <Dialog open={kicking !== null} onClose={() => setKicking(null)} title={`Kick ${kicking?.username ?? ""}?`}>
+      <Dialog open={kicking !== null} onClose={() => setKicking(null)} title={`Kick ${kicking ? displayName(kicking) : ""}?`}>
         <p className="text-sm text-muted">They won&apos;t be able to rejoin this room.</p>
         <div className="mt-6 flex justify-end gap-2">
           <Button variant="ghost" onClick={() => setKicking(null)}>
@@ -156,7 +146,6 @@ export function PlayerList({
       <ProfileCard
         player={selected}
         isHost={selected?.user_id === snapshot.room.host_id}
-        online={selected ? onlineSet.has(selected.user_id) : false}
         onClose={() => setSelected(null)}
       />
     </section>

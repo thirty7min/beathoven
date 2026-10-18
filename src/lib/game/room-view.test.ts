@@ -68,11 +68,6 @@ describe("heroClock", () => {
 describe("phaseStat", () => {
   it("reports the per-phase completion count", () => {
     expect(phaseStat(snap())).toEqual({ label: "Ready", done: 1, total: 2 });
-    expect(phaseStat(snap({}, { readiness: { ready: 2, total: 2, all_ready: true, can_start: true } }))).toEqual({
-      label: "Ready",
-      done: 2,
-      total: 2,
-    });
     const sub = { id: "s", user_id: "b", storage_path: "", duration_ms: 1000, submitted_at: "" };
     expect(phaseStat(snap({ status: "producing" }, { submissions: [sub] }))).toEqual({ label: "Submitted", done: 1, total: 2 });
     expect(

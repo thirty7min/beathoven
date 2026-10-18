@@ -9,18 +9,18 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function load(reducedMotion: boolean): VisualizerPrefs {
-  if (typeof window === "undefined") return parsePrefs(null, reducedMotion);
+function load(): VisualizerPrefs {
+  if (typeof window === "undefined") return parsePrefs(null);
   try {
-    return parsePrefs(window.localStorage.getItem(STORAGE_KEY), reducedMotion);
+    return parsePrefs(window.localStorage.getItem(STORAGE_KEY));
   } catch {
-    return parsePrefs(null, reducedMotion);
+    return parsePrefs(null);
   }
 }
 
 export function useVisualizerPrefs() {
   const [reducedMotion] = useState(prefersReducedMotion);
-  const [prefs, setPrefs] = useState(() => load(reducedMotion));
+  const [prefs, setPrefs] = useState(load);
 
   function save(next: VisualizerPrefs) {
     setPrefs(next);

@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { canvasFallback, cycleStyle, flowSpeed, measureBands, parsePrefs, smoothBands, smoothToward, vignetteGradient, type Bands } from "./visualizer";
+import { ANALYSER_FFT_SIZE } from "./audio-graph";
+import {
+  BAND_EDGES_HZ,
+  BEAT_GAIN,
+  bandBins,
+  blendMix,
+  canvasFallback,
+  cycleStyle,
+  easeInOutCubic,
+  flowSpeed,
+  isSilentSpectrum,
+  measureBands,
+  parsePrefs,
+  reactiveLevels,
+  smoothBands,
+  smoothToward,
+  vignetteGradient,
+  type Bands,
+} from "./visualizer";
 
 describe("style cycling", () => {
   it("cycles both ways and wraps", () => {
@@ -19,17 +37,67 @@ describe("vignetteGradient", () => {
   });
 });
 
+describe("reactiveLevels", () => {
+  it("scales only the beat over the original mapping", () => {
+    const levels = reactiveLevels({ bass: 0.5, mid: 0.4, high: 0.3 }, false, { pulse: 0, mid: 0, shimmer: 0 });
+    expect(levels.pulse).toBeCloseTo(0.5 * BEAT_GAIN);
+    expect(levels.mid).toBe(0.4);
+    expect(levels.shimmer).toBe(0.3);
+  });
+
+  it("stays still under reduced motion", () => {
+    expect(reactiveLevels({ bass: 1, mid: 1, high: 1 }, true, { pulse: 1, mid: 1, shimmer: 1 })).toEqual({ pulse: 0, mid: 0, shimmer: 0 });
+  });
+
+  it("pulses from a spectrum with strong low bins", () => {
+    const binHz = 48_000 / 2048;
+    const spectrum = new Uint8Array(1024).fill(40);
+    for (let i = 1; i < 11; i++) spectrum[i] = 235;
+    let bands: Bands = { bass: 0, mid: 0, high: 0 };
+    const target = measureBands(spectrum, binHz, { bass: 0, mid: 0, high: 0 });
+    for (let i = 0; i < 6; i++) bands = smoothBands(bands, target, 16);
+    const levels = reactiveLevels(bands, false, { pulse: 0, mid: 0, shimmer: 0 });
+    expect(levels.pulse).toBeGreaterThan(0.5);
+    expect(levels.pulse).toBeGreaterThan(levels.mid * 2);
+  });
+});
+
+describe("bandBins", () => {
+  const fftSize = ANALYSER_FFT_SIZE;
+  const bins = fftSize / 2;
+
+  it.each([44_100, 48_000])("keeps the bass band under 260 Hz at %i Hz", (sampleRate) => {
+    const binHz = sampleRate / fftSize;
+    const [bassStart, bassEnd] = bandBins(binHz, BAND_EDGES_HZ.bass[0], BAND_EDGES_HZ.bass[1], bins);
+    expect(bassStart * binHz).toBeLessThanOrEqual(BAND_EDGES_HZ.bass[0]);
+    expect((bassEnd - 1) * binHz).toBeLessThan(260);
+    expect(bassEnd - bassStart).toBeGreaterThanOrEqual(10);
+  });
+
+  it("matches the exact bins at 48 kHz", () => {
+    expect(bandBins(48_000 / 2048, 20, 250, 1024)).toEqual([0, 11]);
+    expect(bandBins(44_100 / 2048, 20, 250, 1024)).toEqual([0, 12]);
+  });
+});
+
+describe("isSilentSpectrum", () => {
+  it("spots an all-zero spectrum", () => {
+    expect(isSilentSpectrum(new Uint8Array(8))).toBe(true);
+    expect(isSilentSpectrum(Uint8Array.from([0, 0, 3]))).toBe(false);
+  });
+});
+
 describe("parsePrefs", () => {
-  it("defaults to on with aurora, or off under reduced motion", () => {
-    expect(parsePrefs(null, false)).toEqual({ on: true, style: "aurora" });
-    expect(parsePrefs(null, true)).toEqual({ on: false, style: "aurora" });
+  it("defaults to off with aurora when nothing is saved", () => {
+    expect(parsePrefs(null)).toEqual({ on: false, style: "aurora" });
   });
 
   it("restores saved values and drops retired or junk styles", () => {
-    expect(parsePrefs(JSON.stringify({ on: false, style: "plasma" }), false)).toEqual({ on: false, style: "plasma" });
-    expect(parsePrefs(JSON.stringify({ on: true, style: "halftone" }), false)).toEqual({ on: true, style: "halftone" });
-    expect(parsePrefs(JSON.stringify({ on: true, style: "bars" }), false)).toEqual({ on: true, style: "aurora" });
-    expect(parsePrefs("{", false)).toEqual({ on: true, style: "aurora" });
+    expect(parsePrefs(JSON.stringify({ on: false, style: "plasma" }))).toEqual({ on: false, style: "plasma" });
+    expect(parsePrefs(JSON.stringify({ on: true, style: "halftone" }))).toEqual({ on: true, style: "halftone" });
+    expect(parsePrefs(JSON.stringify({ on: true, style: "bars" }))).toEqual({ on: true, style: "aurora" });
+    expect(parsePrefs(JSON.stringify({ style: "tunnel" }))).toEqual({ on: false, style: "tunnel" });
+    expect(parsePrefs("{")).toEqual({ on: false, style: "aurora" });
   });
 });
 
@@ -90,5 +158,23 @@ describe("canvasFallback", () => {
 
   it("needs a fresh canvas when WebGL claimed it and the shader failed", () => {
     expect(canvasFallback("failed")).toBe("fresh-canvas");
+  });
+});
+
+describe("style blend timing", () => {
+  it("eases in and out symmetrically and clamps", () => {
+    expect(easeInOutCubic(0)).toBe(0);
+    expect(easeInOutCubic(0.5)).toBe(0.5);
+    expect(easeInOutCubic(1)).toBe(1);
+    expect(easeInOutCubic(0.25)).toBeCloseTo(1 - easeInOutCubic(0.75));
+    expect(easeInOutCubic(-1)).toBe(0);
+    expect(easeInOutCubic(2)).toBe(1);
+  });
+
+  it("maps elapsed time onto the blend and finishes instantly with no duration", () => {
+    expect(blendMix(0, 800)).toBe(0);
+    expect(blendMix(400, 800)).toBe(0.5);
+    expect(blendMix(1200, 800)).toBe(1);
+    expect(blendMix(10, 0)).toBe(1);
   });
 });

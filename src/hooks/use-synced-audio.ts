@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useSound } from "@/components/sound-provider";
 import type { Playback } from "@/lib/game/phase";
 import { fadeGain, syncAudio } from "@/lib/game/playback-sync";
-import { connectMedia, setGraphGain, type MediaGraph } from "@/lib/ui/audio-graph";
+import { connectMedia, setGraphBoost, setGraphGain, type MediaGraph } from "@/lib/ui/audio-graph";
 import { isAudioBlocked, registerMedia, reportAudioBlocked, subscribeAudioBlocked } from "@/lib/ui/audio-unlock";
 
-export function useSyncedAudio(playback: Playback, url: string | null) {
+export function useSyncedAudio(playback: Playback, url: string | null, boostDb = 0) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const graphRef = useRef<MediaGraph | null>(null);
   const [buffering, setBuffering] = useState(false);
@@ -43,6 +43,7 @@ export function useSyncedAudio(playback: Playback, url: string | null) {
       if (audio.volume !== 1) audio.volume = 1;
       if (audio.muted) audio.muted = false;
       setGraphGain(graph, muted ? 0 : target);
+      setGraphBoost(graph, boostDb);
     } else {
       if (Math.abs(audio.volume - target) > 0.001) audio.volume = target;
       if (audio.muted !== muted) audio.muted = muted;

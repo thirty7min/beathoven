@@ -20,7 +20,7 @@ export function ProducingView({ room, serverNow }: { room: RoomController; serve
   const produceOver = produceEnd !== null && now >= produceEnd;
   const closed = phaseEnd !== null && now >= phaseEnd;
   const elapsed = produceEnd !== null ? 1 - Math.max(0, produceEnd - now) / (state.produce_seconds * 1000) : 0;
-  const mySubmission = snapshot.submissions.find((s) => s.user_id === snapshot.me) ?? null;
+  const mySubmission = snapshot.my_submission ?? null;
   const prompt = snapshot.assets.find((a) => a.kind === "prompt")?.prompt;
   const copy = submitPhaseCopy(state.mode);
   const countdown = phaseCountdown(state, snapshot.submissions, now);

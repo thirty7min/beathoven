@@ -9,7 +9,7 @@ function hash(value: string): number {
   return Math.abs(h);
 }
 
-const SIZES = { xs: 24, sm: 32, md: 40, lg: 48, editor: 72, xl: 96 } as const;
+const SIZES = { xs: 24, sm: 32, md: 40, lg: 48, editor: 72, xl: 96, fluid: 96 } as const;
 
 export function Avatar({
   name,
@@ -25,10 +25,13 @@ export function Avatar({
   className?: string;
 }) {
   const px = SIZES[size];
+  const fluid = size === "fluid";
+  const box = fluid ? undefined : { width: px, height: px };
   const base = cn("relative inline-flex shrink-0 overflow-hidden rounded-full", className);
+  const initial = name.replace(/[^A-Za-z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
   if (url) {
     return (
-      <span className={cn(base, "bg-raised")} style={{ width: px, height: px }}>
+      <span className={cn(base, "bg-raised")} style={box}>
         <Image src={url} alt="" width={px} height={px} unoptimized className="block size-full max-w-none object-cover" />
       </span>
     );
@@ -37,9 +40,9 @@ export function Avatar({
     <span
       aria-hidden
       className={cn(base, "flex items-center justify-center font-semibold text-white/90")}
-      style={{ width: px, height: px, fontSize: Math.max(10, px * 0.4), backgroundColor: TINTS[hash(seed ?? name) % TINTS.length] }}
+      style={{ ...box, fontSize: fluid ? undefined : Math.max(10, px * 0.4), backgroundColor: TINTS[hash(seed ?? name) % TINTS.length] }}
     >
-      {name.replace(/[^A-Za-z0-9]/g, "").slice(0, 1).toUpperCase() || "?"}
+      {fluid ? <span className="text-[0.32em]">{initial}</span> : initial}
     </span>
   );
 }

@@ -147,6 +147,7 @@ describe("bots", () => {
     await registerBot();
     const { host, roomId } = await lobby();
     const bot = await addBot(host, roomId);
+    await rpc(db, host, "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, host, "update_room_settings", { p_room_id: roomId, p_listen_seconds: 30 });
     const s = await snapshot(host, roomId);
     expect(s.players.find((p) => p.user_id === bot.user_id)!.is_ready).toBe(true);
@@ -159,6 +160,7 @@ describe("bots", () => {
     await registerBot();
     const { host, roomId } = await lobby();
     const bots = [await addBot(host, roomId), await addBot(host, roomId)];
+    await rpc(db, host, "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, host, "start_game", { p_room_id: roomId });
 
     expect((await snapshot(host, roomId)).submitted_user_ids.sort()).toEqual(
@@ -178,6 +180,9 @@ describe("bots", () => {
       await expirePhase(roomId);
       s = await snapshot(host, roomId);
     }
+    expect(s.room.status).toBe("reviewing");
+    await expirePhase(roomId);
+    s = await snapshot(host, roomId);
     expect(s.room.status).toBe("results");
     expect((await db.query("select * from public.track_skips")).rows).toEqual([]);
   });
@@ -204,9 +209,10 @@ describe("bots", () => {
     await registerBot();
     const { host, roomId } = await lobby();
     const bot = await addBot(host, roomId);
+    await rpc(db, host, "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, host, "start_game", { p_room_id: roomId });
     await submit(host, roomId);
-    for (let i = 0; i < 2; i++) await expirePhase(roomId);
+    for (let i = 0; i < 3; i++) await expirePhase(roomId);
     const s = await snapshot(host, roomId);
     expect(s.room.status).toBe("results");
     expect(s.results.map((r) => r.user_id).sort()).toEqual([bot.user_id, host].sort());

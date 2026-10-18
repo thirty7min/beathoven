@@ -19,6 +19,7 @@ async function send(method: "POST" | "DELETE", body: Record<string, string>): Pr
 }
 
 export async function devToolsEnabled(): Promise<boolean> {
+  if (process.env.NODE_ENV !== "development") return false;
   try {
     const response = await fetch(ENDPOINT, { cache: "no-store" });
     if (!response.ok) return false;

@@ -15,6 +15,23 @@ export type ProfileTrack = {
   avg_rating: number | null;
   best_finish: number;
   last_played_at: string;
+  latest_submission_id: string | null;
+  duration_ms: number | null;
+  clip_start_ms: number | null;
+  clip_end_ms: number | null;
+  peaks: number[] | null;
+  loudness_lufs: number | null;
+  true_peak_dbtp: number | null;
+  loudness_boost: boolean | null;
+  playable: boolean;
+};
+
+export type TrackStream = {
+  url: string;
+  expiresAt: string;
+  loudnessLufs: number | null;
+  truePeakDbtp: number | null;
+  loudnessBoost: boolean;
 };
 
 export type MatchSource = "exact" | "fingerprint" | "manual";
@@ -83,4 +100,17 @@ export async function confirmTrackSuggestion(supabase: TypedSupabaseClient, subm
 
 export async function dismissTrackSuggestion(supabase: TypedSupabaseClient, submissionId: string) {
   unwrap(await supabase.rpc("dismiss_track_suggestion", { p_submission_id: submissionId }));
+}
+
+export async function getTrackStreamUrl(trackId: string, fetcher: typeof fetch = fetch): Promise<TrackStream> {
+  const response = await fetcher(`/api/tracks/${encodeURIComponent(trackId)}/stream`, { cache: "no-store" });
+  const body = (await response.json().catch(() => null)) as (TrackStream & { error?: string }) | null;
+  if (!response.ok || !body?.url) throw toGameError({ message: body?.error ?? "unknown" });
+  return {
+    url: body.url,
+    expiresAt: body.expiresAt,
+    loudnessLufs: body.loudnessLufs ?? null,
+    truePeakDbtp: body.truePeakDbtp ?? null,
+    loudnessBoost: body.loudnessBoost ?? false,
+  };
 }

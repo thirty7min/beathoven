@@ -13,6 +13,7 @@ import {
   advancePhase,
   approachLevel,
   badgeEdge,
+  coronaLength,
   createFlameShape,
   fireBoxStyle,
   fireBufferSize,
@@ -192,20 +193,30 @@ function FireCanvas({ level, still, onCold, onFail }: FireCanvasProps) {
 }
 
 const FALLBACK_LAYERS = [
-  { color: FLAME_PALETTE[0], width: 1, height: 1 },
-  { color: FLAME_PALETTE[1], width: 0.86, height: 0.8 },
-  { color: FLAME_PALETTE[2], width: 0.74, height: 0.62 },
-  { color: FLAME_PALETTE[3], width: 0.64, height: 0.46 },
+  { color: FLAME_PALETTE[0], scale: 1 },
+  { color: FLAME_PALETTE[1], scale: 0.72 },
+  { color: FLAME_PALETTE[2], scale: 0.48 },
+  { color: FLAME_PALETTE[3], scale: 0.28 },
 ];
 
-function teardrop(width: number, height: number) {
-  return `M ${-width} 0.2 C ${-width} -0.9, ${-width * 0.35} ${-height * 0.75}, 0 ${-height} C ${width * 0.35} ${-height * 0.75}, ${width} -0.9, ${width} 0.2 Z`;
+const FALLBACK_TONGUES = 9;
+
+function coronaPath(scale: number) {
+  const points = Array.from({ length: 96 }, (_, i) => {
+    const angle = (i / 96) * Math.PI * 2;
+    const tongue = 0.8 + 0.2 * Math.cos(FALLBACK_TONGUES * angle);
+    const radius = 1 + coronaLength(FULL_FLAME, Math.sin(angle)) * scale * tongue;
+    return `${(radius * Math.cos(angle)).toFixed(3)} ${(-radius * Math.sin(angle)).toFixed(3)}`;
+  });
+  return `M ${points.join(" L ")} Z`;
 }
+
+const FALLBACK_PATHS = FALLBACK_LAYERS.map((layer) => ({ color: layer.color, d: coronaPath(layer.scale) }));
 
 function FireFallback({ level, still }: { level: FlameLevel; still: boolean }) {
   const id = useId();
   const shape = flameShape(level.fire);
-  const { width, height } = FULL_FLAME;
+  const scale = (1 + shape.height) / (1 + FULL_FLAME.height);
 
   return (
     <svg
@@ -242,10 +253,10 @@ function FireFallback({ level, still }: { level: FlameLevel; still: boolean }) {
       <g
         filter={`url(#${id}-turbulence)`}
         className="transition-[transform,opacity] duration-300 ease-snappy motion-reduce:transition-none"
-        style={{ opacity: shape.opacity, transform: `scale(${shape.width / width}, ${shape.height / height})`, transformOrigin: "0 0" }}
+        style={{ opacity: shape.opacity, transform: `scale(${scale})`, transformOrigin: "0 0" }}
       >
-        {FALLBACK_LAYERS.map((layer) => (
-          <path key={layer.color} fill={layer.color} d={teardrop(width * layer.width, height * layer.height)} />
+        {FALLBACK_PATHS.map((layer) => (
+          <path key={layer.color} fill={layer.color} d={layer.d} />
         ))}
       </g>
       <g className="transition-opacity duration-300 ease-snappy" style={{ opacity: level.smoke }}>

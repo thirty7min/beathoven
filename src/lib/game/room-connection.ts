@@ -2,8 +2,8 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { ensureSession, type TypedSupabaseClient } from "@/lib/supabase/client";
 import { Backoff } from "./backoff";
 import { ServerClock } from "./clock";
-import { isMissingRpc, isTransientError } from "./error-kind";
-import { GameError, toGameError } from "./errors";
+import { isTransientError } from "./error-kind";
+import { GameError } from "./errors";
 import { advanceDueAt } from "./phase";
 import { onlineUserIds, roomReducer, initialRoomViewState, type RoomAction, type RoomViewState } from "./room-store";
 import * as rpc from "./rpc";
@@ -14,7 +14,6 @@ import { decideVersion } from "./version";
 const ADVANCE_JITTER_MS = 400;
 const BROADCAST_GRACE_MS = 1500;
 const RESYNC_HEARTBEAT_MS = 30_000;
-const TOUCH_HEARTBEAT_MS = 20_000;
 
 export class RoomConnection {
   readonly clock = new ServerClock();
@@ -36,7 +35,6 @@ export class RoomConnection {
   private reopenTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly reopenBackoff = new Backoff(1000, 15_000);
   private resyncHeartbeat: ReturnType<typeof setInterval> | null = null;
-  private touchHeartbeat: ReturnType<typeof setInterval> | null = null;
   private detachWindow: (() => void) | null = null;
 
   constructor(
@@ -67,7 +65,6 @@ export class RoomConnection {
       this.openChannel(gen);
       this.attachWindow();
       this.resyncHeartbeat = setInterval(() => void this.resync(), RESYNC_HEARTBEAT_MS);
-      this.touchHeartbeat = setInterval(() => void this.touch(), TOUCH_HEARTBEAT_MS);
     } catch (error) {
       if (gen === this.generation) this.fail(error);
     }
@@ -100,6 +97,17 @@ export class RoomConnection {
       void this.resync();
       return submissionId;
     },
+    confirmSubmission: async (startMs: number, endMs: number, peaks: number[] | null = null, loudnessBoost: boolean | null = null) => {
+      const result = await this.mutate((id) => rpc.confirmSubmission(this.supabase, id, startMs, endMs, peaks, loudnessBoost));
+      void this.resync();
+      return result;
+    },
+    setSubmissionClip: async (startMs: number, endMs: number, peaks: number[] | null = null, loudnessBoost: boolean | null = null) => {
+      const result = await this.mutate((id) => rpc.setSubmissionClip(this.supabase, id, startMs, endMs, peaks, loudnessBoost));
+      void this.resync();
+      return result;
+    },
+    finishReview: () => this.mutate((id) => rpc.finishReview(this.supabase, id)),
     kickPlayer: (userId: string) => this.mutate((id) => rpc.kickPlayer(this.supabase, id, userId)),
     voteKick: async (targetId: string) => {
       const result = await this.mutate((id) => rpc.voteKick(this.supabase, id, targetId));
@@ -222,8 +230,9 @@ export class RoomConnection {
   private onRoomState(state: RoomState) {
     const decision = decideVersion(this.view.snapshot?.version ?? null, state.version);
     if (decision === "stale") return;
+    const entersReview = state.room.status === "reviewing" && this.view.snapshot?.room.status !== "reviewing";
     this.dispatch({ type: "room_state", state });
-    if (decision === "gap") void this.resync();
+    if (decision === "gap" || entersReview) void this.resync();
   }
 
   resync(): Promise<void> {
@@ -275,17 +284,6 @@ export class RoomConnection {
     }, this.resyncBackoff.next());
   }
 
-  private async touch() {
-    const roomId = this.roomId;
-    if (!roomId) return;
-    try {
-      const { error } = await this.supabase.rpc("touch_room", { p_room_id: roomId });
-      if (error && !isMissingRpc(error) && toGameError(error).code === "not_member") void this.resync();
-    } catch {
-      // Best effort; the next beat retries.
-    }
-  }
-
   // Every client races to call advance_room; the server's row lock makes the extras no-ops.
   private scheduleAdvance() {
     const snapshot = this.view.snapshot;
@@ -326,7 +324,6 @@ export class RoomConnection {
       if (document.visibilityState !== "visible") return;
       void this.syncClock();
       void this.resync();
-      void this.touch();
     };
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("online", wake);
@@ -343,12 +340,10 @@ export class RoomConnection {
     if (this.reopenTimer) clearTimeout(this.reopenTimer);
     if (this.resyncRetryTimer) clearTimeout(this.resyncRetryTimer);
     if (this.resyncHeartbeat) clearInterval(this.resyncHeartbeat);
-    if (this.touchHeartbeat) clearInterval(this.touchHeartbeat);
     this.advanceTimer = null;
     this.reopenTimer = null;
     this.resyncRetryTimer = null;
     this.resyncHeartbeat = null;
-    this.touchHeartbeat = null;
     this.advanceKey = null;
     this.resyncBackoff.reset();
     this.reopenBackoff.reset();

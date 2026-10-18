@@ -40,7 +40,7 @@ export function LobbiesScreen() {
     (r) =>
       (mode === "all" || r.mode === mode) &&
       (!hasSpace || r.player_count < r.max_players) &&
-      (!needle || [r.code, r.host_username, r.name].some((v) => (v ?? "").toLowerCase().includes(needle))),
+      (!needle || [r.code, r.host_username, r.host_display_name, r.name].some((v) => (v ?? "").toLowerCase().includes(needle))),
   );
   const countFor = (m: RoomMode | "all") => all.filter((r) => m === "all" || r.mode === m).length;
 

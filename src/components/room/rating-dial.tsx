@@ -1,11 +1,11 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/components/ui/cn";
 import { MAX_SCORE, scoreAngle, scoreFromKey, scoreFromPoint, shouldSend, stepScore } from "@/lib/game/dial";
 import { SCORE_LABELS, type VoteState } from "@/lib/game/voting";
-import { Flames } from "./flames";
+import { FLAME_EFFECTS, useFlameStyle } from "./flame-styles";
 
 const W = 240;
 const H = 150;
@@ -44,6 +44,12 @@ function sendIfNeeded(sync: DialSync, score: number, dragging: boolean) {
   sync.onRate(sync.submissionId, score);
 }
 
+function releaseDrag(dragging: RefObject<boolean>, sync: DialSync) {
+  if (!dragging.current) return;
+  dragging.current = false;
+  if (sync.draft !== null) sendIfNeeded(sync, sync.draft, false);
+}
+
 export function RatingDial({
   submissionId,
   state,
@@ -55,6 +61,7 @@ export function RatingDial({
 }) {
   const [draft, setDraft] = useState<number | null>(null);
   const dragging = useRef(false);
+  const flame = useFlameStyle();
   const sync = useRef<DialSync>({ draft: null, sent: null, sentAt: null, onRate, submissionId });
   const interactive = state.kind === "open";
   const value = state.kind === "unavailable" || state.kind === "own_track" ? null : (draft ?? state.score);
@@ -74,6 +81,12 @@ export function RatingDial({
     if (state.kind === "closed") flush();
     return flush;
   }, [state.kind]);
+
+  useEffect(() => {
+    const release = () => releaseDrag(dragging, sync.current);
+    window.addEventListener("blur", release);
+    return () => window.removeEventListener("blur", release);
+  }, []);
 
   function change(score: number, isDragging = false) {
     sync.current.draft = score;
@@ -106,12 +119,11 @@ export function RatingDial({
   }
 
   function endDrag() {
-    if (!dragging.current) return;
-    dragging.current = false;
-    if (sync.current.draft !== null) sendIfNeeded(sync.current, sync.current.draft, false);
+    releaseDrag(dragging, sync.current);
   }
 
   const dim = !interactive;
+  const FlameEffect = FLAME_EFFECTS[flame.style];
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -133,14 +145,19 @@ export function RatingDial({
             aria-disabled={!interactive}
             className={cn("relative w-[min(64vw,320px)] touch-none select-none focus:outline-none", interactive && "cursor-pointer")}
             onPointerDown={(e) => {
-              if (!interactive) return;
+              if (!interactive || e.button !== 0) return;
               e.currentTarget.setPointerCapture(e.pointerId);
               dragging.current = true;
               pick(e);
             }}
-            onPointerMove={(e) => dragging.current && interactive && pick(e)}
+            onPointerMove={(e) => {
+              if (!dragging.current) return;
+              if (e.buttons === 0) endDrag();
+              else if (interactive) pick(e);
+            }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onLostPointerCapture={endDrag}
           >
             {Array.from({ length: MAX_SCORE }, (_, i) => (
               <path
@@ -162,14 +179,14 @@ export function RatingDial({
             className="@container pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
             style={{ left: `${(CX / W) * 100}%`, top: `${(CY / H) * 100}%`, width: `${((HUB * 2) / W) * 100}%`, aspectRatio: "1" }}
           >
-            <Flames score={interactive || state.kind === "closed" ? value : null}>
+            <FlameEffect score={interactive || state.kind === "closed" ? value : null}>
               <output
                 aria-hidden
                 className="relative flex size-full items-center justify-center rounded-full border-[1.5px] border-line-strong bg-raised text-[52cqw] leading-none font-bold tabular-nums"
               >
                 {value ?? "–"}
               </output>
-            </Flames>
+            </FlameEffect>
           </div>
         </div>
 
@@ -177,7 +194,11 @@ export function RatingDial({
           <ChevronRight className="h-6 w-6" />
         </ArrowButton>
       </div>
-
+      {process.env.NODE_ENV === "development" && (
+        <button type="button" onClick={flame.cycle} className="rounded-full border border-dashed border-line-strong px-2.5 py-1 font-mono text-[11px] text-muted hover:text-fg">
+          flame: {flame.style}
+        </button>
+      )}
     </div>
   );
 }

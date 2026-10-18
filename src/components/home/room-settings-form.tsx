@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { ModeIcon } from "./mode-icon";
@@ -17,11 +18,13 @@ import {
   modeName,
   withCurrent,
 } from "@/lib/game/room-settings";
+import { DEFAULT_GENRE, GENRES, genreLabel, type Genre } from "@/lib/game/genres";
 import type { Room, RoomMode } from "@/lib/game/types";
 
 export type RoomSettingsDraft = {
   mode: RoomMode;
   name: string;
+  genre: Genre;
   maxPlayers: number;
   produceSeconds: number;
   listenSeconds: number;
@@ -29,9 +32,10 @@ export type RoomSettingsDraft = {
   revealNames: boolean;
 };
 
-export const DEFAULT_DRAFT: RoomSettingsDraft = { mode: "classic", name: "", ...DEFAULT_SETTINGS, revealNames: false };
+export const DEFAULT_DRAFT: RoomSettingsDraft = { mode: "classic", name: "", genre: DEFAULT_GENRE, ...DEFAULT_SETTINGS, revealNames: false };
 
 const MODE_OPTIONS = MODES.map((m) => ({ value: m.id, label: m.name, description: m.blurb, icon: <ModeIcon mode={m.id} /> }));
+const GENRE_OPTIONS = GENRES.map((g) => ({ value: g.slug as Genre, label: g.label }));
 const LISTEN_LABEL = "Listen time per track";
 const NAMES_HINT = "Shown: everyone sees who made the track that's playing. Hidden: names appear in the results.";
 
@@ -42,12 +46,22 @@ export function RoomSettingsForm({
   onChange,
   minPlayers = SETTINGS_LIMITS.maxPlayers.min,
   namePlaceholder,
+  autoFocusName = false,
 }: {
   value: RoomSettingsDraft;
   onChange: (next: RoomSettingsDraft) => void;
   minPlayers?: number;
   namePlaceholder?: string;
+  autoFocusName?: boolean;
 }) {
+  const nameInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!autoFocusName) return;
+    nameInput.current?.focus();
+    nameInput.current?.select();
+  }, [autoFocusName]);
+
   const set = <K extends keyof RoomSettingsDraft>(key: K, v: RoomSettingsDraft[K]) => onChange({ ...value, [key]: v });
   const uploadOnly = isUploadOnly(value.mode);
 
@@ -62,16 +76,28 @@ export function RoomSettingsForm({
 
   return (
     <div className="flex flex-col gap-3">
-      <Input
-        aria-label="Room name"
-        value={value.name}
-        maxLength={ROOM_NAME_MAX}
-        onChange={(e) => set("name", e.target.value)}
-        placeholder={namePlaceholder ?? "Room name"}
-      />
       <SettingList>
+        <SettingRow label="Room name">
+          <span className="relative inline-flex">
+            <Input
+              ref={nameInput}
+              aria-label="Room name"
+              value={value.name}
+              maxLength={ROOM_NAME_MAX}
+              onChange={(e) => set("name", e.target.value)}
+              placeholder={namePlaceholder ?? "Room name"}
+              className="w-44 pr-14 sm:w-60"
+            />
+            <span aria-hidden className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted tabular-nums">
+              {value.name.length}/{ROOM_NAME_MAX}
+            </span>
+          </span>
+        </SettingRow>
         <SettingRow label="Game mode">
           <Select label="Game mode" value={value.mode} options={MODE_OPTIONS} onChange={selectMode} />
+        </SettingRow>
+        <SettingRow label="Genre">
+          <Select label="Genre" value={value.genre} options={GENRE_OPTIONS} onChange={(g) => set("genre", g)} />
         </SettingRow>
         <SettingRow label={submitPhaseCopy(value.mode).timeSetting}>
           {uploadOnly ? (
@@ -138,6 +164,7 @@ export function RoomSettingsSummary({ room }: { room: Room }) {
       <SettingRow label="Game mode" hint={mode?.blurb}>
         {modeName(room.mode)}
       </SettingRow>
+      <SettingRow label="Genre">{genreLabel(room.genre)}</SettingRow>
       <SettingRow label={submitPhaseCopy(room.mode).timeSetting}>{formatSeconds(room.produce_seconds)}</SettingRow>
       <SettingRow label={LISTEN_LABEL}>{listen ? `${listen}s` : "Full track"}</SettingRow>
       <SettingRow label="Max players">{room.max_players}</SettingRow>

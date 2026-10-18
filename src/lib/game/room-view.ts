@@ -25,6 +25,8 @@ export function heroClock(snapshot: RoomSnapshot, serverNow: number | null): Her
       return { label: "Next track starts in", remainingMs: countdown.remainingMs };
     case "track":
       return { label: "Track ends in", remainingMs: countdown.remainingMs };
+    case "review":
+      return { label: "Review ends in", remainingMs: countdown.remainingMs };
     case "results":
       return { label: "Back to lobby in", remainingMs: countdown.remainingMs };
   }
@@ -36,7 +38,7 @@ export function phaseStat(snapshot: RoomSnapshot): PhaseStat {
   const players = activePlayers(snapshot.players);
   switch (snapshot.room.status) {
     case "lobby": {
-      const { ready, total } = snapshot.readiness ?? readyCount(snapshot.players, snapshot.room.host_id);
+      const { ready, total } = readyCount(snapshot.players);
       return { label: "Ready", done: ready, total };
     }
     case "producing": {
@@ -53,6 +55,8 @@ export function phaseStat(snapshot: RoomSnapshot): PhaseStat {
           );
       return { label: "Rated", done: voted, total: eligible };
     }
+    case "reviewing":
+      return { label: "Done", done: snapshot.review?.done_user_ids.length ?? 0, total: snapshot.review?.total ?? players.length };
     case "results":
       return { label: "Tracks", done: snapshot.results.length, total: snapshot.results.length };
     default:

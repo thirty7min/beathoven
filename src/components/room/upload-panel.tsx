@@ -1,14 +1,15 @@
 "use client";
 
 import { FileAudio, Plus } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import { cn } from "@/components/ui/cn";
 import { ProgressBar } from "@/components/ui/progress";
 import { AUDIO_ACCEPT, MAX_SUBMISSION_BYTES, MAX_TRACK_MS, MIN_TRACK_MS, formatBytes, validateAudioFile, validateDuration } from "@/lib/game/audio-file";
 import { formatClock } from "@/lib/game/format";
 import { readAudioDuration } from "@/lib/game/storage";
-import type { Submission } from "@/lib/game/types";
+import type { MySubmission } from "@/lib/game/types";
+import type { ClipWindow } from "@/lib/ui/clip-window";
 import { SubmittedTrack } from "./submitted-track";
 import type { RoomController } from "./types";
 import { notifyError } from "@/lib/ui/notify";
@@ -23,7 +24,7 @@ export function UploadPanel({
   closed,
 }: {
   room: RoomController;
-  mySubmission: Submission | null;
+  mySubmission: MySubmission | null;
   closesInMs: number | null;
   lastCall: boolean;
   closed: boolean;
@@ -36,6 +37,16 @@ export function UploadPanel({
   const [dragging, setDragging] = useState(false);
   const [submittedFile, setSubmittedFile] = useState<File | null>(null);
   const busy = upload !== null || reading;
+  const { confirmSubmission, setSubmissionClip } = room.actions;
+  const confirmClip = useCallback(async (clip: ClipWindow, peaks: number[] | null, loudnessBoost: boolean | null) => {
+    const result = await confirmSubmission(clip.startMs, clip.endMs, peaks, loudnessBoost);
+    toast.success("Clip submitted");
+    return result;
+  }, [confirmSubmission]);
+  const saveDraft = useCallback(
+    (clip: ClipWindow, peaks: number[] | null, loudnessBoost: boolean | null) => setSubmissionClip(clip.startMs, clip.endMs, peaks, loudnessBoost),
+    [setSubmissionClip],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -74,7 +85,7 @@ export function UploadPanel({
       await room.actions.submitTrack(file, durationMs, (progress) => mounted.current && setUpload({ name: file.name, progress }));
       if (!mounted.current) return;
       setSubmittedFile(file);
-      toast.success(replacing ? "Track replaced" : "Track submitted");
+      toast.success(replacing ? "Track replaced. Pick your clip and submit again." : "Uploaded. Pick your clip and submit.");
     } catch (e) {
       if (!mounted.current) {
         toast(replacing ? "Listening started, your previous upload was kept" : "Listening started before your upload finished");
@@ -116,13 +127,16 @@ export function UploadPanel({
     return (
       <div {...dropProps} className={cn("flex flex-col gap-2 rounded-2xl transition-[box-shadow] duration-150", dragging && "ring-2 ring-fg/60")}>
         <SubmittedTrack
-          key={mySubmission.id}
+          key={`${mySubmission.id}:${mySubmission.storage_path}`}
           submission={mySubmission}
           file={submittedFile}
           name={submittedFile?.name ?? null}
           listenSeconds={room.snapshot?.room.listen_seconds}
+          closed={closed}
           onReplace={closed || busy ? null : () => inputRef.current?.click()}
           replacing={upload}
+          onConfirm={confirmClip}
+          onSaveDraft={saveDraft}
         />
         {error && <p className="text-sm text-danger">{error}</p>}
         {picker}

@@ -1,30 +1,32 @@
 "use client";
 
 import { Pause, Play, Trophy } from "lucide-react";
-import { useRef } from "react";
+import { Fragment } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge, HighlightPill } from "@/components/ui/badge";
 import { cn } from "@/components/ui/cn";
 import { useHoverPreview } from "@/hooks/use-hover-preview";
+import { usePreviewCard } from "@/hooks/use-preview-card";
 import { useSignedUrl } from "@/hooks/use-signed-url";
 import { useWaveform } from "@/hooks/use-waveform";
-import { formatClock, formatScore } from "@/lib/game/format";
-import { clipMs } from "@/lib/game/phase";
+import { formatClock } from "@/lib/game/format";
+import { clipMs, clipStartMs } from "@/lib/game/phase";
 import { outcome } from "@/lib/game/scoring";
 import { SUBMISSIONS_BUCKET } from "@/lib/game/storage";
 import type { RoomSnapshot, RoundResult } from "@/lib/game/types";
-import { resamplePeaks } from "@/lib/game/waveform";
+import { fitFontSize } from "@/lib/ui/headline";
+import { pointsLabel, totalPoints } from "@/lib/ui/points";
 import { StageCounter, StageHeader } from "./stage";
 import { SeekableWaveform } from "./waveform";
-
-const MINI_BARS = 48;
+import { displayName } from "@/lib/ui/display-name";
+import { playbackBoostDb } from "@/lib/ui/loudness";
 
 export function ResultsView({ snapshot, serverNow }: { snapshot: RoomSnapshot; serverNow: number | null }) {
   const preview = useHoverPreview();
   const results = [...snapshot.results].sort((a, b) => a.rank - b.rank);
   const result = outcome(results.map((r) => ({ userId: r.user_id, isWinner: r.is_winner })));
   const player = (id: string) => snapshot.players.find((p) => p.user_id === id);
-  const name = (id: string) => player(id)?.username ?? "Unknown player";
+  const name = (id: string) => displayName(player(id));
   const winner = results.find((r) => r.is_winner);
   const now = serverNow ?? Date.parse(snapshot.server_time);
   const lobbyAt = snapshot.room.phase_ends_at ? Date.parse(snapshot.room.phase_ends_at) : null;
@@ -39,22 +41,39 @@ export function ResultsView({ snapshot, serverNow }: { snapshot: RoomSnapshot; s
           {result.kind === "winner" && winner ? (
             <>
               <HighlightPill>Winner</HighlightPill>
-              <div className="flex max-w-full items-center gap-4">
-                <Avatar name={name(result.userId)} url={player(result.userId)?.avatar_url} seed={result.userId} size="lg" className="shrink-0" />
-                <p className="truncate text-[clamp(2.75rem,9vw,6rem)] leading-none font-black tracking-tight">{name(result.userId)}</p>
+              <div className="@container flex w-full justify-center">
+                <p
+                  className="flex max-w-full min-w-0 items-center gap-[0.2em] leading-tight font-black tracking-tight"
+                  style={{ fontSize: fitFontSize([name(result.userId)], { minRem: 1.875, maxRem: 6, capCqi: 14, share: 0.96, singleLine: true, extraEm: 1.2 }) }}
+                >
+                  <Avatar name={name(result.userId)} url={player(result.userId)?.avatar_url} seed={result.userId} size="fluid" className="size-[0.8em] min-h-12 min-w-12 animate-pop" />
+                  <span className="min-w-0 flex-1 truncate" title={name(result.userId)}>
+                    {name(result.userId)}
+                  </span>
+                </p>
               </div>
               <p className="text-sm text-muted">
-                {formatScore(winner.avg_score)} average from {winner.vote_count} {winner.vote_count === 1 ? "vote" : "votes"}
+                {pointsLabel(totalPoints(winner.avg_score, winner.vote_count))} from {winner.vote_count} {winner.vote_count === 1 ? "vote" : "votes"}
                 {result.userId === snapshot.me && " · that's you!"}
               </p>
             </>
           ) : result.kind === "tie" ? (
             <>
               <HighlightPill>It&apos;s a tie</HighlightPill>
-              <p className="text-[clamp(2.25rem,7vw,4.5rem)] leading-tight font-black tracking-tight text-balance">
-                {result.userIds.map(name).join(" & ")}
-              </p>
-              <p className="text-sm text-muted">Tied on {formatScore(winner?.avg_score ?? null)} average. Everyone on top gets a tie.</p>
+              <div className="@container w-full">
+                <p
+                  className="leading-tight font-black tracking-tight text-balance"
+                  style={{ fontSize: fitFontSize(result.userIds.map(name), { minRem: 1.5, maxRem: result.userIds.length > 2 ? 3.25 : 4.5, capCqi: result.userIds.length > 2 ? 8 : 11 }) }}
+                >
+                  {result.userIds.map((id, i) => (
+                    <Fragment key={id}>
+                      {i > 0 && (i === result.userIds.length - 1 ? " & " : ", ")}
+                      <span className="[overflow-wrap:anywhere]">{name(id)}</span>
+                    </Fragment>
+                  ))}
+                </p>
+              </div>
+              <p className="text-sm text-muted">Tied on {pointsLabel(winner ? totalPoints(winner.avg_score, winner.vote_count) : null)}. Everyone on top gets a tie.</p>
             </>
           ) : (
             <>
@@ -75,9 +94,9 @@ export function ResultsView({ snapshot, serverNow }: { snapshot: RoomSnapshot; s
                 playing={preview.activeId === r.submission_id}
                 blocked={preview.blockedId === r.submission_id}
                 progress={preview.activeId === r.submission_id ? preview.progress : 0}
-                onEnter={(url, limitMs) => preview.enter(r.submission_id, url, limitMs)}
+                onEnter={(url, limitMs, startMs) => preview.enter(r.submission_id, url, limitMs, startMs, playbackBoostDb(r))}
                 onLeave={() => preview.leave(r.submission_id)}
-                onTap={(url, limitMs) => preview.tap(r.submission_id, url, limitMs)}
+                onTap={(url, limitMs, startMs) => preview.tap(r.submission_id, url, limitMs, startMs, playbackBoostDb(r))}
                 onSeek={(ms) => preview.seek(r.submission_id, ms)}
               />
             ))}
@@ -108,30 +127,24 @@ function ContestantCard({
   playing: boolean;
   blocked: boolean;
   progress: number;
-  onEnter: (url: string, limitMs: number | null) => void;
+  onEnter: (url: string, limitMs: number | null, startMs: number) => void;
   onLeave: () => void;
-  onTap: (url: string, limitMs: number | null) => void;
+  onTap: (url: string, limitMs: number | null, startMs: number) => void;
   onSeek: (ms: number) => void;
 }) {
-  const pointer = useRef("mouse");
   const player = snapshot.players.find((p) => p.user_id === result.user_id);
   const submission = snapshot.submissions.find((s) => s.id === result.submission_id);
   const { url, error } = useSignedUrl(SUBMISSIONS_BUCKET, submission?.storage_path);
   const clip = submission ? clipMs(snapshot.room.listen_seconds, submission) : null;
-  const { peaks } = useWaveform(submission?.storage_path, url, clip);
-  const username = player?.username ?? "Unknown player";
+  const start = submission ? clipStartMs(submission) : 0;
+  const { peaks } = useWaveform(submission?.storage_path, url, clip, start);
+  const username = displayName(player);
   const mine = result.user_id === snapshot.me;
+  const card = usePreviewCard(url, clip, start, { enter: onEnter, leave: onLeave, tap: onTap });
 
   return (
     <li
-      onPointerDown={(e) => {
-        pointer.current = e.pointerType;
-      }}
-      onPointerEnter={(e) => e.pointerType === "mouse" && url && onEnter(url, clip)}
-      onPointerLeave={(e) => e.pointerType === "mouse" && onLeave()}
-      onClick={(e) => {
-        if (pointer.current !== "mouse" && url && !(e.target instanceof Element && e.target.closest("button"))) onTap(url, clip);
-      }}
+      {...card}
       style={{ animationDelay: `${200 + Math.min(order, 8) * 50}ms` }}
       className={cn(
         "grid animate-reveal grid-cols-[2rem_minmax(0,1fr)_auto_auto] items-center gap-x-4 gap-y-3 rounded-2xl border p-3 transition-[background-color,border-color] duration-150 ease-snappy sm:grid-cols-[2.5rem_minmax(0,1fr)_minmax(0,11rem)_auto_auto] sm:p-4",
@@ -153,7 +166,7 @@ function ContestantCard({
         </span>
       </span>
       <SeekableWaveform
-        peaks={peaks && resamplePeaks(peaks, MINI_BARS)}
+        peaks={peaks}
         progress={progress}
         clipMs={clip}
         onSeek={playing ? onSeek : null}
@@ -162,11 +175,11 @@ function ContestantCard({
         waveClassName="h-8 sm:h-10"
       />
       <span className="flex flex-col items-end">
-        <span className="text-2xl leading-none font-bold tabular-nums">{formatScore(result.avg_score)}</span>
-        <span className="mt-1 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Avg</span>
+        <span className="text-2xl leading-none font-bold tabular-nums">{totalPoints(result.avg_score, result.vote_count) ?? "–"}</span>
+        <span className="mt-1 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">Pts</span>
       </span>
       <button
-        onClick={() => url && onTap(url, clip)}
+        onClick={() => url && onTap(url, clip, start)}
         disabled={!url}
         aria-label={playing ? `Pause ${username}'s track` : `Play ${username}'s track`}
         title={error ? "Track unavailable" : undefined}

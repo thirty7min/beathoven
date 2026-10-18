@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/components/ui/cn";
 import { formatDuration } from "@/lib/game/audio-file";
 import { seekPosition } from "@/lib/game/playback-sync";
-import { WAVEFORM_BARS, playedBars } from "@/lib/game/waveform";
+import { BAR_GAP_PX, BAR_WIDTH_PX, MIN_BAR_HEIGHT, barCount, playedBars, resampleHeights } from "@/lib/game/waveform";
 
 function barTone(index: number, played: number, preview: number | null): string {
   if (preview !== null && index >= Math.min(played, preview) && index < Math.max(played, preview)) {
@@ -24,25 +24,39 @@ export function Waveform({
   preview?: number | null;
   className?: string;
 }) {
-  const total = peaks?.length ?? WAVEFORM_BARS;
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  const bars = useMemo(() => (peaks ? resampleHeights(peaks, barCount(width)) : null), [peaks, width]);
+  const total = bars?.length ?? 0;
   const played = playedBars(total, progress);
   const previewBar = preview === null ? null : playedBars(total, preview);
+  const clamped = Math.min(1, Math.max(0, progress));
+
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
+      ref={box}
       role="progressbar"
       aria-label="Track progress"
       aria-valuemin={0}
       aria-valuemax={100}
-      aria-valuenow={Math.round(Math.min(1, Math.max(0, progress)) * 100)}
-      className={cn("relative flex w-full items-center gap-px", className ?? "h-24 sm:h-28")}
+      aria-valuenow={Math.round(clamped * 100)}
+      className={cn("relative flex w-full items-center", className ?? "h-24 sm:h-28")}
+      style={{ gap: BAR_GAP_PX }}
     >
-      {peaks ? (
-        peaks.map((peak, i) => (
+      {bars ? (
+        bars.map((height, i) => (
           <span
             key={i}
-            className={cn("min-w-0 flex-1 rounded-full transition-colors duration-150", barTone(i, played, previewBar))}
-            style={{ height: `${Math.max(4, peak * 100)}%` }}
+            className={cn("shrink-0 rounded-full transition-colors duration-150", barTone(i, played, previewBar))}
+            style={{ width: BAR_WIDTH_PX, height: `${Math.max(MIN_BAR_HEIGHT, height) * 100}%` }}
           />
         ))
       ) : (
@@ -50,7 +64,7 @@ export function Waveform({
           <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 animate-pulse rounded-full bg-white/10" />
           <span
             className="absolute inset-x-0 top-1/2 h-1 origin-left -translate-y-1/2 rounded-full bg-fg transition-transform duration-200 ease-linear"
-            style={{ transform: `scaleX(${played / WAVEFORM_BARS})` }}
+            style={{ transform: `scaleX(${clamped})` }}
           />
         </>
       )}

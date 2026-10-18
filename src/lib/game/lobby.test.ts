@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerPhaseStatus, readyCount, startCheck } from "./lobby";
+import { hasSubmitted, memberBadge, readyCount, startCheck } from "./lobby";
 import type { RoomPlayer, RoomSnapshot } from "./types";
 
 const player = (user_id: string, over: Partial<RoomPlayer> = {}): RoomPlayer => ({
@@ -57,61 +57,82 @@ describe("startCheck", () => {
     });
   });
 
-  it("offers a force start while others aren't ready", () => {
+  it("offers a force start while anyone, the host included, isn't ready", () => {
     expect(startCheck(snap({ players: [player("host"), player("b"), player("c", { is_ready: true })] }), true)).toEqual({
       kind: "force",
-      waitingFor: 1,
+      ready: 1,
+      total: 3,
+    });
+    expect(startCheck(snap({ players: [player("host"), player("b", { is_ready: true })] }), true)).toEqual({
+      kind: "force",
+      ready: 1,
+      total: 2,
     });
   });
 
-  it("is ready once every other active player is ready", () => {
-    const players = [player("host"), player("b", { is_ready: true }), player("gone", { left_at: "x" })];
+  it("is ready once every active player, the host included, is ready", () => {
+    const players = [player("host", { is_ready: true }), player("b", { is_ready: true }), player("gone", { left_at: "x" })];
     expect(startCheck(snap({ players }), true)).toEqual({ kind: "ready" });
   });
 });
 
 describe("readyCount", () => {
-  it("counts active players only, with the host implicitly ready", () => {
+  it("counts active players only, the host by their own toggle", () => {
     const players = [player("a", { is_ready: true }), player("b"), player("c", { is_ready: true, left_at: "x" }), player("host")];
-    expect(readyCount(players, null)).toEqual({ ready: 1, total: 3 });
-    expect(readyCount(players, "host")).toEqual({ ready: 2, total: 3 });
+    expect(readyCount(players)).toEqual({ ready: 1, total: 3 });
+    expect(readyCount([...players.slice(0, 3), player("host", { is_ready: true })])).toEqual({ ready: 2, total: 3 });
   });
 });
 
-describe("playerPhaseStatus", () => {
+describe("hasSubmitted", () => {
   const track = { id: "t1", user_id: "b", storage_path: "", duration_ms: 1000, submitted_at: "" };
 
-  it("shows ready in the lobby and submissions while producing", () => {
-    const s = snap({ players: [player("host"), player("b")] });
-    expect(playerPhaseStatus(s, "host")).toBe("ready");
-    expect(playerPhaseStatus(s, "b")).toBe("waiting");
-    const producing = snap({ submissions: [track] }, { status: "producing" });
-    expect(playerPhaseStatus(producing, "b")).toBe("done");
-    expect(playerPhaseStatus(producing, "host")).toBe("waiting");
+  it("reads the round's submitters while producing and after", () => {
+    const producing = snap({ submitted_user_ids: ["b"] }, { status: "producing" });
+    expect(hasSubmitted(producing, "b")).toBe(true);
+    expect(hasSubmitted(producing, "host")).toBe(false);
+    expect(hasSubmitted(snap({ submitted_user_ids: ["b"] }, { status: "listening" }), "b")).toBe(true);
+    expect(hasSubmitted(snap({ submitted_user_ids: ["b"] }, { status: "results" }), "b")).toBe(true);
   });
 
-  it("uses submitted_user_ids while producing, when the track list is hidden", () => {
-    const producing = snap({ submitted_user_ids: ["host"] }, { status: "producing" });
-    expect(playerPhaseStatus(producing, "host")).toBe("done");
-    expect(playerPhaseStatus(producing, "b")).toBe("waiting");
+  it("falls back to the visible tracks and to your own submission", () => {
+    expect(hasSubmitted(snap({ submissions: [track] }, { status: "producing" }), "b")).toBe(true);
+    const mine = snap({ submitted_user_ids: [], my_submission: { ...track, id: "t2", user_id: "host", confirmed: true, clip_start_ms: 0, clip_end_ms: 1000 } }, { status: "producing" });
+    expect(hasSubmitted(mine, "host")).toBe(true);
+    expect(hasSubmitted(mine, "b")).toBe(false);
   });
 
-  it("shows votes on the current track in reveal rooms and hides the author", () => {
-    const s = snap(
-      { submissions: [track], current_votes: { submission_id: "t1", count: 1, eligible: 1, voted_user_ids: ["host"] } },
-      { status: "listening", track_order: ["t1"], current_track: 0, reveal_names: true },
-    );
-    expect(playerPhaseStatus(s, "host")).toBe("done");
-    expect(playerPhaseStatus(s, "b")).toBeNull();
+  it("only rings your own track once you confirm it", () => {
+    const draft = { ...track, id: "t2", user_id: "host", confirmed: false, clip_start_ms: 0, clip_end_ms: 1000 };
+    expect(hasSubmitted(snap({ submitted_user_ids: [], my_submission: draft }, { status: "producing" }), "host")).toBe(false);
+    expect(hasSubmitted(snap({ submitted_user_ids: ["host"], my_submission: draft }, { status: "producing" }), "host")).toBe(false);
   });
 
-  it("shows no per-player vote status in blind rooms", () => {
-    const blind = { ...track, user_id: null };
-    const s = snap(
-      { submissions: [blind], current_votes: { submission_id: "t1", count: 1, eligible: 1 } },
-      { status: "listening", track_order: ["t1"], current_track: 0, reveal_names: false },
-    );
-    expect(playerPhaseStatus(s, "host")).toBeNull();
-    expect(playerPhaseStatus(s, "b")).toBeNull();
+  it("never rings in the lobby, even with last game's submitters", () => {
+    expect(hasSubmitted(snap({ submitted_user_ids: ["b"] }), "b")).toBe(false);
+    expect(hasSubmitted(snap({ submitted_user_ids: ["b"] }, { status: "closed" }), "b")).toBe(false);
+  });
+});
+
+describe("memberBadge", () => {
+  it("marks every ready lobby member for everyone, bots and the host included", () => {
+    const players = [player("host", { is_ready: true }), player("b"), player("bot", { is_ready: true, is_bot: true })];
+    for (const me of ["host", "b"]) {
+      const s = snap({ me, players });
+      expect(memberBadge(s, "host", null)).toBe("ready");
+      expect(memberBadge(s, "b", null)).toBeNull();
+      expect(memberBadge(s, "bot", null)).toBe("ready");
+    }
+  });
+
+  it("drops the host's badge when they unready", () => {
+    expect(memberBadge(snap({ players: [player("host"), player("b")] }), "host", null)).toBeNull();
+  });
+
+  it("puts playing first and shows no status text in game", () => {
+    const players = [player("host", { is_ready: true }), player("b", { is_ready: true })];
+    expect(memberBadge(snap({ players }), "b", "b")).toBe("playing");
+    expect(memberBadge(snap({ players }, { status: "results" }), "b", null)).toBeNull();
+    expect(memberBadge(snap({ players, submitted_user_ids: ["b"] }, { status: "producing" }), "b", null)).toBeNull();
   });
 });

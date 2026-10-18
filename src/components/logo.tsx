@@ -1,25 +1,33 @@
 import Image from "next/image";
 import { cn } from "./ui/cn";
 
-function LogoMark({ size = 28, className }: { size?: number; className?: string }) {
-  return (
-    <Image
-      src="/brand/logo.svg"
-      alt=""
-      width={size}
-      height={size}
-      unoptimized
-      className={cn("shrink-0 rounded-md", className)}
-      style={{ width: size, height: size }}
-    />
-  );
-}
+const HEIGHT = 28;
+const LOCKUP_WIDTH = Math.round((HEIGHT * 156) / 40);
 
-export function Logo({ className, wordmarkClassName }: { className?: string; wordmarkClassName?: string }) {
+export function Logo({ className, collapse = false }: { className?: string; collapse?: boolean }) {
   return (
-    <span className={cn("flex items-center gap-2.5", className)}>
-      <LogoMark />
-      <span className={cn("text-[15px] font-bold tracking-tight", wordmarkClassName)}>Beathoven</span>
+    <span className={cn("flex items-center", className)}>
+      <Image
+        src="/brand/beathoven.svg"
+        alt="Beathoven"
+        width={LOCKUP_WIDTH}
+        height={HEIGHT}
+        unoptimized
+        priority
+        className={cn("shrink-0", collapse && "hidden sm:block")}
+        style={{ width: LOCKUP_WIDTH, height: HEIGHT }}
+      />
+      {collapse && (
+        <Image
+          src="/brand/logo.svg"
+          alt="Beathoven"
+          width={HEIGHT}
+          height={HEIGHT}
+          unoptimized
+          className="shrink-0 sm:hidden"
+          style={{ width: HEIGHT, height: HEIGHT }}
+        />
+      )}
     </span>
   );
 }

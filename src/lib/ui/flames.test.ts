@@ -19,7 +19,9 @@ import {
   fireBufferSize,
   fireMounted,
   flameLevel,
+  coronaLength,
   flameReach,
+  rimHeat,
   flameShape,
   glslColor,
   glslFloat,
@@ -110,7 +112,7 @@ describe("flameShape", () => {
     const reach = flameReach(shape(1));
     expect(reach.top).toBeLessThanOrEqual(FIRE_BOX.top - EDGE_FADE);
     expect(reach.side).toBeLessThanOrEqual(FIRE_BOX.right - EDGE_FADE);
-    expect(-FIRE_BOX.left).toBe(FIRE_BOX.right);
+    expect(reach.side).toBeLessThanOrEqual(-FIRE_BOX.left - EDGE_FADE);
   });
 
   it("hides the flame when cold", () => {
@@ -156,8 +158,13 @@ describe("fire canvas", () => {
     expect(fireBoxStyle({ left: -1, right: 1, bottom: -1, top: 1 })).toEqual({ left: "0%", top: "0%", width: "100%", height: "100%" });
     const box = fireBoxStyle();
     expect(box.left).toBe(`${((FIRE_BOX.left + 1) / 2) * 100}%`);
-    expect(parseFloat(box.top)).toBeLessThan(-100);
-    expect(parseFloat(box.height)).toBeGreaterThan(parseFloat(box.width));
+    const [left, top, width, height] = [box.left, box.top, box.width, box.height].map(parseFloat);
+    const reach = flameReach(shape(1));
+    expect(left + width).toBeCloseTo(100 - left);
+    expect(-top).toBeGreaterThanOrEqual(((reach.top - 1) / 2) * 100);
+    expect(-left).toBeGreaterThanOrEqual(((reach.side - 1) / 2) * 100);
+    expect(top + height).toBeGreaterThan(100);
+    expect(-top).toBeGreaterThan(top + height - 100);
   });
 });
 
@@ -166,7 +173,8 @@ describe("flat flame style", () => {
     expect(FLAME_BANDS).toHaveLength(FLAME_PALETTE.length);
     for (let i = 1; i < FLAME_BANDS.length; i++) expect(FLAME_BANDS[i]).toBeGreaterThan(FLAME_BANDS[i - 1]);
     expect(FLAME_BANDS[0]).toBeGreaterThan(0);
-    expect(FLAME_BANDS.at(-1)).toBeLessThan(1 - 1 / shape(1).height);
+    expect(FLAME_BANDS.at(-1)).toBeLessThan(rimHeat(1));
+    expect(FLAME_BANDS.at(-1)).toBeGreaterThan(rimHeat(flameLevel(2).fire));
   });
 
   it("turns hex colours into shader literals", () => {
@@ -174,6 +182,26 @@ describe("flat flame style", () => {
     expect(glslColor("#ffffff")).toBe("vec3(1.000, 1.000, 1.000)");
     expect(glslFloat(3)).toBe("3.0");
     expect(glslFloat(0.25)).toBe("0.25");
+  });
+});
+
+describe("corona", () => {
+  it("wraps the badge in a rounded burn instead of a single spire", () => {
+    const blaze = shape(1);
+    const top = coronaLength(blaze, 1);
+    const shoulder = coronaLength(blaze, Math.SQRT1_2);
+    const side = coronaLength(blaze, 0);
+    expect(side).toBeGreaterThan(top * 0.5);
+    expect(shoulder).toBeGreaterThan(side);
+    expect(top).toBeGreaterThanOrEqual(shoulder);
+    expect(coronaLength(blaze, -1)).toBe(0);
+    const reach = flameReach(blaze);
+    expect(reach.top / reach.side).toBeLessThan(1.5);
+  });
+
+  it("grows from a rim lick at 2 to the fullest burn at 5", () => {
+    const lengths = [2, 3, 4, 5].map((score) => coronaLength(shape(flameLevel(score).fire), 0.5));
+    for (let i = 1; i < lengths.length; i++) expect(lengths[i]).toBeGreaterThan(lengths[i - 1]);
   });
 });
 

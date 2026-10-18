@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { useAuth } from "@/components/auth-provider";
 import { LeaveRoomDialog } from "@/components/leave-room-dialog";
@@ -11,8 +11,9 @@ import { ModeTooltipContent } from "@/components/mode-badge";
 import { SelectCard } from "@/components/ui/select-card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanels, Tabs } from "@/components/ui/tabs";
 import { useCurrentRoom } from "@/hooks/use-current-room";
+import { useOnHide } from "@/hooks/use-on-hide";
 import { usePublicRooms } from "@/hooks/use-public-rooms";
 import { quickMatch } from "@/lib/game/rpc";
 import { MODES } from "@/lib/game/room-settings";
@@ -27,6 +28,7 @@ type View = "lobbies" | "queue";
 export function PlayScreen() {
   const { status } = useAuth();
   const [view, setView] = useState<View>("lobbies");
+  const tabIds = useId();
 
   if (status === "loading") return <div className="h-96 animate-pulse rounded-2xl bg-surface" />;
   if (status !== "signed_in") {
@@ -49,8 +51,16 @@ export function PlayScreen() {
         ]}
         active={view}
         onChange={setView}
+        ids={tabIds}
       />
-      {view === "lobbies" ? <LobbiesPanel /> : <QueuePanel />}
+      <TabPanels
+        active={view}
+        ids={tabIds}
+        panels={[
+          { id: "lobbies", content: <LobbiesPanel /> },
+          { id: "queue", content: <QueuePanel /> },
+        ]}
+      />
     </div>
   );
 }
@@ -69,6 +79,10 @@ function QueuePanel() {
   const [mode, setMode] = useState<RoomMode>("classic");
   const [finding, setFinding] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  useOnHide(() => {
+    setFinding(false);
+    setConfirming(false);
+  });
 
   async function find() {
     setConfirming(false);

@@ -26,6 +26,7 @@ describe("room list", () => {
     expect(roomTitle(room({ name: " Trap beats " }))).toBe("Trap beats");
     expect(roomTitle(room())).toBe("wilba's room");
     expect(roomTitle(room({ host_username: null }))).toBe("Open room");
+    expect(roomTitle(room({ name: "", host_display_name: "Wilba ✨" }))).toBe("Wilba ✨'s room");
   });
 
   it("splits open lobbies from rooms in progress", () => {

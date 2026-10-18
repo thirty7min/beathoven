@@ -1,5 +1,6 @@
 import {
   BAND_SOFTNESS,
+  CORONA_PROFILE,
   EDGE_FADE,
   EMBER_COUNT,
   EMBER_RADIUS,
@@ -15,8 +16,10 @@ import {
   NOISE_SCALE,
   PHASE_PERIOD,
   RIM_COLOR,
+  RIM_HEAT,
   SMOKE_COLOR,
   SMOKE_PUFFS,
+  TONGUE_SPREAD,
   glslColor,
   glslFloat,
   type BadgeEdge,
@@ -124,18 +127,19 @@ void main() {
   float outside = smoothstep(u_edge.x - u_edge.y, u_edge.x, r);
   float inside = 1.0 - outside;
   float flicker = 1.0 + ${glslFloat(FLAME_FLICKER)} * (2.0 * noise(vec2(u_phase * 2.0, 7.0)) - 1.0);
-  float height = u_shape.x * flicker;
-  float width = u_shape.y;
+  float flank = smoothstep(${glslFloat(CORONA_PROFILE.fadeFrom)}, ${glslFloat(CORONA_PROFILE.fadeTo)}, up);
+  float corona = mix(u_shape.y, u_shape.x, smoothstep(${glslFloat(CORONA_PROFILE.side)}, ${glslFloat(CORONA_PROFILE.top)}, up)) * flank * flicker;
 
   vec2 q = vec2(p.x * ${glslFloat(NOISE_SCALE.x)}, p.y * ${glslFloat(NOISE_SCALE.y)} - u_phase);
   vec2 warp = vec2(fbm(q + vec2(0.0, 31.0)), fbm(q + vec2(57.0, 13.0))) - 0.5;
   float n = fbm(q + warp * 1.2);
 
-  float lift = clamp(p.y / height, 0.0, 1.0);
-  vec2 e = vec2((p.x + warp.x * ${glslFloat(FLAME_SWAY)} * lift) / (width * (1.0 - 0.55 * lift)), p.y > 0.0 ? p.y / height : p.y / 0.55);
-  float reach = length(e);
-  float heat = 1.0 - reach + (n - 0.5) * (0.25 + 0.6 * lift);
-  heat *= 1.0 - smoothstep(1.0, ${glslFloat(ENVELOPE_LIMIT)}, reach);
+  float swayed = length(vec2(p.x + warp.x * ${glslFloat(FLAME_SWAY)} * clamp(r - 1.0, 0.0, 1.0), p.y)) - 1.0;
+  float tongueLength = corona * (1.0 + ${glslFloat(TONGUE_SPREAD)} * (2.0 * n - 1.0));
+  float reach = max(swayed / max(tongueLength, 0.001), -0.5);
+  float lift = clamp(reach, 0.0, 1.0);
+  float heat = (1.0 - reach) * mix(${glslFloat(RIM_HEAT.cold)}, ${glslFloat(RIM_HEAT.hot)}, u_level.x) + (n - 0.5) * (0.55 + 0.35 * lift);
+  heat *= (1.0 - smoothstep(1.0, ${glslFloat(ENVELOPE_LIMIT)}, reach)) * flank;
   float seam = (r - 1.0) / 0.1;
   heat += exp(-seam * seam) * smoothstep(-0.55, 0.3, p.y) * (0.3 + 0.4 * n) * u_light.y;
   heat *= u_shape.w;
@@ -156,13 +160,13 @@ void main() {
   float haloRadius = (0.25 + 0.45 * u_light.x) * flicker;
   float glow = (1.0 - smoothstep(haloRadius * 0.35, haloRadius, halo)) * outside * ${glslFloat(GLOW_ALPHA)} * u_light.x * (0.85 + 0.3 * n);
   float rim = smoothstep(0.78, 0.96, r) * inside * smoothstep(0.1, 0.5, up) * u_light.y * 0.55 * flicker;
-  float tint = inside * u_light.w * 0.12 * smoothstep(-0.2, 1.0, p.y);
+  float tint = inside * u_light.w * 0.04 * smoothstep(-0.2, 1.0, p.y);
 
   vec2 fq = vec2(p.x * ${glslFloat(NOISE_SCALE.x * 1.4)}, p.y * ${glslFloat(NOISE_SCALE.y * 1.4)} - u_phase * 2.0);
   float tongue = fbm(fq + vec2(71.0, 5.0) + warp);
-  float engulf = u_light.z * smoothstep(-0.3, 0.6, up);
+  float engulf = u_light.z * smoothstep(0.3, 0.85, up);
   float depth = r + (tongue - 0.5) * 0.2 * engulf;
-  float overlap = smoothstep(mix(0.9, 0.55, engulf), mix(1.0, 0.75, engulf), depth) * smoothstep(-0.9, -0.3, up);
+  float overlap = smoothstep(mix(0.9, 0.75, engulf), mix(1.0, 0.92, engulf), depth) * smoothstep(-0.9, -0.3, up);
   float cover = max(outside, overlap);
 
   float sparks = 0.0;
@@ -173,7 +177,7 @@ void main() {
     float c = hash(vec2(fi, 37.0));
     float life = fract(u_phase * (110.0 + floor(b * 50.0)) / ${PERIOD} + c);
     float x = (a - 0.5) * 1.4;
-    vec2 pos = vec2(x + sin(life * 5.0 + a * 6.2832) * 0.18, sqrt(max(1.0 - x * x, 0.0)) - 0.05 + life * u_shape.x * 0.9);
+    vec2 pos = vec2(x + sin(life * 5.0 + a * 6.2832) * 0.18, sqrt(max(1.0 - x * x, 0.0)) - 0.05 + life * (u_shape.x + 0.6));
     float radius = ${glslFloat(EMBER_RADIUS)} * (1.0 - life) * clamp(u_level.z * ${glslFloat(EMBER_COUNT)} - fi, 0.0, 1.0);
     sparks = max(sparks, 1.0 - smoothstep(radius - 0.025, radius, length(p - pos)));
   }
@@ -182,7 +186,7 @@ void main() {
   color = over(color, ${glslColor(GLOW_COLOR)}, clamp(glow, 0.0, 1.0));
   color = over(color, ${glslColor(RIM_COLOR)}, rim);
   color = over(color, ${glslColor(GLOW_COLOR)}, tint);
-  color = over(color, flame(heat), cover);
+  color = over(color, flame(mix(heat, min(heat, ${B3} - ${SOFT} * 2.0), inside)), cover);
   color = over(color, ${YELLOW}, sparks);
   gl_FragColor = color;
 }

@@ -9,9 +9,11 @@ import { useAuth } from "@/components/auth-provider";
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCurrentRoom } from "@/hooks/use-current-room";
+import { useVisit } from "@/hooks/use-on-hide";
 import { useRoom } from "@/hooks/use-room";
 import { useServerNow } from "@/hooks/use-server-now";
 import { friendlyError } from "@/lib/game/error-messages";
+import { joinGateView } from "@/lib/game/join-gate";
 import { isRemovedError, wasRemoved } from "@/lib/game/kick";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { isRoomCode } from "@/lib/game/room-settings";
@@ -21,11 +23,13 @@ import { ListeningView } from "./listening-view";
 import { LobbyView } from "./lobby-view";
 import { ProducingView } from "./producing-view";
 import { ResultsView } from "./results-view";
+import { ReviewView } from "./review-view";
 import { RoomDebug } from "./room-debug";
 import { useRoomAction } from "./use-room-action";
 
 export function RoomScreen({ code, debug }: { code: string; debug: boolean }) {
   const { status, user } = useAuth();
+  const visit = useVisit();
 
   if (!isRoomCode(code)) {
     return <Notice title="That isn't a room code" body="Room codes are 6 letters and numbers, like ABC123." />;
@@ -42,7 +46,7 @@ export function RoomScreen({ code, debug }: { code: string; debug: boolean }) {
       </Card>
     );
   }
-  return <JoinGate key={user.id} code={code} userId={user.id} debug={debug} />;
+  return <JoinGate key={`${user.id}:${visit}`} code={code} userId={user.id} debug={debug} />;
 }
 
 function JoinGate({ code, userId, debug }: { code: string; userId: string; debug: boolean }) {
@@ -50,8 +54,9 @@ function JoinGate({ code, userId, debug }: { code: string; userId: string; debug
   const [confirmed, setConfirmed] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
-  if (loading) return <RoomSkeleton />;
-  if (current && current.code !== code && !confirmed) {
+  const view = joinGateView({ loading, current, code, confirmed });
+  if (view === "loading") return <RoomSkeleton />;
+  if (view === "confirm" && current) {
     return (
       <Card className="mx-auto flex w-full max-w-xl flex-col gap-4 p-6 sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight">You&apos;ll leave room {current.code}</h1>
@@ -137,6 +142,7 @@ function RoomLive({ code, debug, onRetry }: { code: string; debug: boolean; onRe
     <GameShell room={room} serverNow={serverNow} onLeave={leave} leaving={leaving}>
       {status === "producing" && <ProducingView room={room} serverNow={serverNow} />}
       {status === "listening" && <ListeningView room={room} serverNow={serverNow} />}
+      {status === "reviewing" && <ReviewView room={room} serverNow={serverNow} />}
       {status === "results" && <ResultsView snapshot={snapshot} serverNow={serverNow} />}
       {debug && (
         <div className="px-5 pb-6">

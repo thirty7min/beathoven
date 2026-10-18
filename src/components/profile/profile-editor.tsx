@@ -11,7 +11,7 @@ import { removeAvatar, uploadAvatar } from "@/lib/profile/avatar";
 import { normalizeDaws } from "@/lib/profile/daw-selection";
 import type { DawSlug } from "@/lib/profile/daws";
 import { saveProfileLink } from "@/lib/profile/link";
-import { BIO_MAX, suggestUsername, validateProfile, type ProfileErrors } from "@/lib/profile/validate";
+import { BIO_MAX, DISPLAY_NAME_MAX, normalizeDisplayName, suggestUsername, validateDisplayName, validateProfile, type ProfileErrors } from "@/lib/profile/validate";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { notifyError, notifyFailure } from "@/lib/ui/notify";
 import { normalizeLinkInput } from "@/lib/ui/profile-link";
@@ -31,6 +31,8 @@ export function ProfileEditor({
   onSaved: (profile: Profile) => void;
 }) {
   const { setProfile } = useAuth();
+  const [displayName, setDisplayName] = useState(profile.display_name);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [username, setUsername] = useState(profile.username);
   const [bio, setBio] = useState(profile.bio);
   const [link, setLink] = useState(profile.link_url ?? "");
@@ -52,10 +54,12 @@ export function ProfileEditor({
     event.preventDefault();
     const draft = { username: username.trim(), avatarUrl: "", bio };
     const found = validateProfile(draft);
+    const nameProblem = validateDisplayName(displayName);
     setErrors(found);
+    setDisplayNameError(nameProblem);
     setAvatarError(null);
     setLinkError(null);
-    if (Object.keys(found).length) return;
+    if (Object.keys(found).length || nameProblem) return;
 
     const linkUpdate = linkChange(normalizeLinkInput(link), profile.link_url);
     setSaving(avatar.kind !== "keep" ? "avatar" : linkUpdate.changed ? "link" : "profile");
@@ -76,7 +80,7 @@ export function ProfileEditor({
           setSaving("profile");
           const { data, error } = await getBrowserClient()
             .from("profiles")
-            .update({ username: draft.username, bio: draft.bio, daws })
+            .update({ display_name: normalizeDisplayName(displayName), username: draft.username, bio: draft.bio, daws })
             .eq("id", profile.id)
             .select("*")
             .single();
@@ -94,6 +98,7 @@ export function ProfileEditor({
         } else {
           const code = (result.error as { code?: string }).code;
           if (code === "23505") setErrors({ username: "That username is already taken." });
+          else if (code === "23514" && /display_name/.test((result.error as { message?: string }).message ?? "")) setDisplayNameError(validateDisplayName(displayName) ?? "That display name isn't allowed.");
           else if (code === "23514") notifyFailure("Pick up to 3 DAWs from the list.");
           else notifyError(result.error, "Couldn't save your profile.");
         }
@@ -112,7 +117,7 @@ export function ProfileEditor({
       <form onSubmit={onSubmit} className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <AvatarUploader
-            name={username || profile.username}
+            name={displayName || username || profile.display_name}
             seed={profile.id}
             currentUrl={profile.avatar_url}
             change={avatar}
@@ -128,13 +133,25 @@ export function ProfileEditor({
             </p>
           )}
         </div>
+        <Field label="Display name" error={displayNameError} hint="Shown to other players.">
+          <Input
+            value={displayName}
+            maxLength={DISPLAY_NAME_MAX * 2}
+            onChange={(e) => {
+              setDisplayName(e.target.value);
+              setDisplayNameError(null);
+            }}
+            autoComplete="nickname"
+            aria-invalid={displayNameError !== null}
+          />
+        </Field>
         <Field label="Username" error={errors.username} hint="3 to 24 letters, numbers or underscores.">
           <Input value={username} maxLength={24} onChange={(e) => setUsername(suggestUsername(e.target.value))} autoComplete="username" />
         </Field>
-        <Field label="Bio" error={errors.bio} hint={`${bio.length}/${BIO_MAX}`}>
+        <Field label="Bio (optional)" error={errors.bio} hint={`${bio.length}/${BIO_MAX}`}>
           <Textarea value={bio} rows={4} maxLength={BIO_MAX} onChange={(e) => setBio(e.target.value)} placeholder="Genres, influences, what you're working on…" />
         </Field>
-        <Field label="Link" error={linkError ?? undefined} hint="Checked for safety before it goes live. Shortened links aren't allowed.">
+        <Field label="Link (optional)" error={linkError ?? undefined}>
           <Input
             value={link}
             onChange={(e) => {
@@ -149,7 +166,7 @@ export function ProfileEditor({
             disabled={saving !== null}
           />
         </Field>
-        <DawPicker value={daws} onChange={setDaws} disabled={saving !== null} />
+        <DawPicker value={daws} onChange={setDaws} label="DAWs (optional)" disabled={saving !== null} />
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={saving !== null}>
             Cancel

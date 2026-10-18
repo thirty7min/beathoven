@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import { cn } from "./cn";
 
 export const inputClasses =
@@ -15,7 +15,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   );
 }
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: ComponentProps<"input">) {
   return <input className={cn(inputClasses, className)} {...rest} />;
 }
 

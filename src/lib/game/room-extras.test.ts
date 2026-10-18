@@ -21,9 +21,9 @@ describe("revealedProducer", () => {
 
 describe("isOwnSubmission", () => {
   it("matches your own entry by id, not by user_id", () => {
-    expect(isOwnSubmission({ my_submission: { ...track, user_id: "me" } }, { ...track, user_id: null })).toBe(true);
+    expect(isOwnSubmission({ my_submission: { ...track, user_id: "me", confirmed: true, clip_start_ms: 0, clip_end_ms: 1000 } }, { ...track, user_id: null })).toBe(true);
     expect(isOwnSubmission({ my_submission: null }, track)).toBe(false);
     expect(isOwnSubmission({}, track)).toBe(false);
-    expect(isOwnSubmission({ my_submission: track }, null)).toBe(false);
+    expect(isOwnSubmission({ my_submission: { ...track, confirmed: false, clip_start_ms: 0, clip_end_ms: 1000 } }, null)).toBe(false);
   });
 });

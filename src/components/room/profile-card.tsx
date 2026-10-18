@@ -10,23 +10,24 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useIsOnline } from "@/components/presence-provider";
 import { StatStrip } from "@/components/ui/stat-strip";
 import type { RoomPlayer } from "@/lib/game/types";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { displayName } from "@/lib/ui/display-name";
 
 export function ProfileCard({
   player,
   isHost,
-  online,
   onClose,
 }: {
   player: RoomPlayer | null;
   isHost: boolean;
-  online: boolean;
   onClose: () => void;
 }) {
   const [profile, setProfile] = useState<{ id: string; data: Profile | null } | null>(null);
   const userId = player?.user_id ?? null;
+  const online = useIsOnline(userId) || player?.is_bot === true;
 
   useEffect(() => {
     if (!userId) return;
@@ -47,15 +48,17 @@ export function ProfileCard({
   const loaded = profile?.id === userId ? profile.data : null;
   const loading = profile?.id !== userId;
   const username = loaded?.username ?? player?.username ?? "";
+  const name = displayName(loaded ?? player, username);
 
   return (
     <Dialog open={player !== null} onClose={onClose} title="Producer" className="max-w-sm">
       {player && (
         <div className="flex flex-col gap-5">
           <div className="flex items-center gap-4">
-            <Avatar name={username} url={loaded?.avatar_url ?? player.avatar_url} seed={player.user_id} size="xl" />
+            <Avatar name={name} url={loaded?.avatar_url ?? player.avatar_url} seed={player.user_id} size="xl" />
             <div className="min-w-0">
-              <p className="truncate text-xl font-bold">{username}</p>
+              <p className="truncate text-xl font-bold">{name}</p>
+              <p className="truncate text-sm text-muted">@{username}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {isHost && (
                   <Badge tone="solid">

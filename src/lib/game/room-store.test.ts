@@ -89,7 +89,16 @@ describe("roomReducer", () => {
   });
 
   it("marks your own entry from my_submission across blind broadcasts", () => {
-    const mine = { id: "s1", user_id: "a", storage_path: "r/1/x.wav", duration_ms: 1000, submitted_at: "2026-10-18T12:00:00Z" };
+    const mine = {
+      id: "s1",
+      user_id: "a",
+      storage_path: "r/1/x.wav",
+      duration_ms: 1000,
+      submitted_at: "2026-10-18T12:00:00Z",
+      confirmed: true,
+      clip_start_ms: 0,
+      clip_end_ms: 1000,
+    };
     const blind = { ...mine, user_id: null, submitted_at: null };
     const producing = loaded(snapshot(3, { my_submission: mine }, { status: "producing" }));
     expect(producing.snapshot!.submissions).toEqual([mine]);
@@ -115,6 +124,30 @@ describe("roomReducer", () => {
     const next = roomReducer(voted, { type: "room_state", state: state(4, { round: 2 }) });
     expect(next.snapshot!.my_skip_votes).toEqual([]);
     expect(next.snapshot!.my_submission).toBeNull();
+  });
+
+  it("keeps the review list for the round and updates it with your own votes", () => {
+    const entry = {
+      submission_id: "s1",
+      position: 1,
+      duration_ms: 60_000,
+      clip_start_ms: 0,
+      clip_end_ms: 45_000,
+      is_mine: false,
+      my_vote: 3,
+      is_default: true,
+    };
+    let view = loaded(snapshot(5, { my_review: [entry] }, { status: "reviewing" }));
+    view = roomReducer(view, { type: "my_vote", vote: { submission_id: "s1", score: 5 } });
+    expect(view.snapshot!.my_review).toEqual([{ ...entry, my_vote: 5, is_default: false }]);
+
+    const review = { done_user_ids: ["b"], total: 2 };
+    view = roomReducer(view, { type: "room_state", state: { ...state(6, { status: "reviewing" }), review } });
+    expect(view.snapshot!.review).toEqual(review);
+    expect(view.snapshot!.my_review).toHaveLength(1);
+
+    view = roomReducer(view, { type: "room_state", state: state(7, { status: "results" }) });
+    expect(view.snapshot!.my_review).toBeNull();
   });
 
   it("tracks connection status and presence", () => {

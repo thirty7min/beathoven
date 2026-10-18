@@ -1,5 +1,6 @@
 import type { DawSlug } from "@/lib/profile/daws";
 import type { RoomMode, RoomStatus, SampleCategory } from "@/lib/supabase/database.types";
+import type { Genre } from "./genres";
 
 export type { RoomMode, RoomStatus, SampleCategory };
 
@@ -9,6 +10,7 @@ export type Room = {
   name?: string;
   host_id: string | null;
   mode: RoomMode;
+  genre?: Genre;
   max_players: number;
   produce_seconds: number;
   /** @deprecated */
@@ -23,11 +25,13 @@ export type Room = {
   track_order: string[];
   current_track: number | null;
   track_started_at: string | null;
+  autostart_at?: string | null;
 };
 
 export type RoomPlayer = {
   user_id: string;
   username: string;
+  display_name?: string;
   avatar_url: string | null;
   joined_at: string;
   left_at: string | null;
@@ -59,8 +63,14 @@ export type Submission = {
   user_id: string | null;
   storage_path: string;
   duration_ms: number;
+  clip_start_ms?: number;
+  clip_end_ms?: number;
   submitted_at: string | null;
-};
+} & Partial<PlaybackLoudness>;
+
+export type PlaybackLoudness = { loudness_lufs: number | null; true_peak_dbtp: number | null; loudness_boost: boolean };
+
+export type MySubmission = Submission & { confirmed: boolean; clip_start_ms: number; clip_end_ms: number };
 
 export type VoteCast = { submission_id: string; voter_id: string };
 
@@ -71,7 +81,9 @@ export type RoundResult = {
   vote_count: number;
   rank: number;
   is_winner: boolean;
-};
+  clip_start_ms?: number;
+  clip_end_ms?: number;
+} & Partial<PlaybackLoudness>;
 
 export type Readiness = { ready: number; total: number; all_ready: boolean; can_start: boolean };
 
@@ -81,6 +93,19 @@ export type KickVote = { target_user_id: string; votes: number; needed: number; 
 
 export type SkipState = { submission_id: string; votes: number; needed: number; you_voted?: boolean };
 
+
+export type ReviewState = { done_user_ids: string[]; total: number };
+
+export type ReviewEntry = {
+  submission_id: string;
+  position: number;
+  duration_ms: number;
+  clip_start_ms: number;
+  clip_end_ms: number;
+  is_mine: boolean;
+  my_vote: number | null;
+  is_default: boolean;
+} & Partial<PlaybackLoudness>;
 
 export type RoomState = {
   version: number;
@@ -95,6 +120,7 @@ export type RoomState = {
   current_votes?: CurrentVotes | null;
   skip?: SkipState | null;
   kick_votes?: KickVote[];
+  review?: ReviewState | null;
 };
 
 export type ChatMessage = {
@@ -102,6 +128,7 @@ export type ChatMessage = {
   room_id: string;
   user_id: string | null;
   username: string | null;
+  display_name?: string | null;
   body: string;
   kind?: "user" | "system";
   created_at: string;
@@ -114,9 +141,10 @@ export type RoomSnapshot = RoomState & {
   me: string;
   my_votes: MyVote[];
   chat: ChatMessage[];
-  my_submission?: Submission | null;
+  my_submission?: MySubmission | null;
   my_skip_votes?: string[];
   my_kick_votes?: string[];
+  my_review?: ReviewEntry[] | null;
 };
 
 export type PresenceEntry = { user_id: string; online_at: string };
@@ -137,6 +165,7 @@ export type PublicProfile = {
   profile: {
     id: string;
     username: string;
+    display_name: string;
     avatar_url: string | null;
     bio: string;
     daws: DawSlug[];
@@ -153,10 +182,12 @@ export type PublicRoom = {
   id: string;
   code: string;
   mode: RoomMode;
+  genre?: Genre;
   status: RoomStatus;
   max_players: number;
   player_count: number;
   host_username: string | null;
+  host_display_name?: string | null;
   name: string;
   round: number;
   phase_ends_at: string | null;
@@ -164,3 +195,8 @@ export type PublicRoom = {
   joinable: boolean;
   created_at: string;
 };
+
+export type ActiveRoom = Pick<
+  PublicRoom,
+  "id" | "code" | "name" | "mode" | "genre" | "status" | "max_players" | "player_count" | "host_username" | "host_display_name"
+>;

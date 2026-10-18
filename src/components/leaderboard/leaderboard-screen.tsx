@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import type { Profile } from "@/components/auth-provider";
 import { EmptyState, LobbyListSkeleton } from "@/components/home/lobby-list";
 import { Avatar } from "@/components/ui/avatar";
+import { cn } from "@/components/ui/cn";
 import { ListRow, ListTable } from "@/components/ui/list";
 import { Tabs } from "@/components/ui/tabs";
 import { getBrowserClient } from "@/lib/supabase/client";
 import type { ListColumn } from "@/lib/ui/list-columns";
+import { displayName } from "@/lib/ui/display-name";
 
 type Sort = "wins" | "games_played";
-type Row = Pick<Profile, "id" | "username" | "avatar_url" | "wins" | "ties" | "games_played">;
+type Row = Pick<Profile, "id" | "username" | "display_name" | "avatar_url" | "wins" | "ties" | "games_played">;
 
 const COLUMNS: ListColumn[] = [
   { label: "Producer", width: "minmax(0,1fr)" },
@@ -29,7 +31,7 @@ export function LeaderboardScreen() {
     const secondary = sort === "wins" ? "games_played" : "wins";
     void getBrowserClient()
       .from("profiles")
-      .select("id, username, avatar_url, wins, ties, games_played")
+      .select("id, username, display_name, avatar_url, wins, ties, games_played")
       .gt("games_played", 0)
       .order(sort, { ascending: false })
       .order(secondary, { ascending: false })
@@ -42,7 +44,8 @@ export function LeaderboardScreen() {
     };
   }, [sort]);
 
-  const rows = data.sort === sort ? data.rows : null;
+  const rows = data.rows;
+  const stale = data.sort !== sort;
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,19 +63,19 @@ export function LeaderboardScreen() {
       ) : rows.length === 0 ? (
         <EmptyState>No battles finished yet. Be the first on the board.</EmptyState>
       ) : (
-        <ListTable columns={COLUMNS}>
+        <ListTable columns={COLUMNS} className={cn("transition-opacity duration-150 ease-snappy", stale && "opacity-60")}>
             {rows.map((row, i) => (
               <ListRow
                 key={row.id}
                 thumb={
                   <>
                     <span className="w-6 shrink-0 text-right text-sm font-semibold text-muted tabular-nums">{i + 1}</span>
-                    <Avatar name={row.username} url={row.avatar_url} seed={row.id} size="lg" />
+                    <Avatar name={displayName(row)} url={row.avatar_url} seed={row.id} size="lg" />
                   </>
                 }
                 title={
                   <Link href={`/u/${row.username}`} className="truncate hover:underline">
-                    {row.username}
+                    {displayName(row)}
                   </Link>
                 }
                 subtitle={`${row.games_played} ${row.games_played === 1 ? "battle" : "battles"}`}

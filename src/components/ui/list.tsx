@@ -57,7 +57,7 @@ export function ListRow({
       {thumb}
       <span className="flex min-w-0 flex-col">
         <span className="flex min-w-0 items-center gap-2 text-[15px] font-semibold">{title}</span>
-        {subtitle && <span className="truncate text-[13px] text-muted">{subtitle}</span>}
+        {subtitle && <span className={cn("text-[13px] text-muted", typeof subtitle === "string" && "truncate")}>{subtitle}</span>}
       </span>
     </span>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
 import type { RoomStatus } from "@/lib/game/types";
+import { useOnHide } from "./use-on-hide";
 
 export type CurrentRoom = { id: string; code: string; status: RoomStatus };
 
@@ -28,12 +29,11 @@ export async function fetchCurrentRoom(userId: string): Promise<CurrentRoom | nu
   return [...rooms].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))[0];
 }
 
+const UNLOADED = { userId: null, room: null, loaded: false };
+
 export function useCurrentRoom(userId: string | null) {
-  const [state, setState] = useState<{ userId: string | null; room: CurrentRoom | null; loaded: boolean }>({
-    userId: null,
-    room: null,
-    loaded: false,
-  });
+  const [state, setState] = useState<{ userId: string | null; room: CurrentRoom | null; loaded: boolean }>(UNLOADED);
+  useOnHide(() => setState(UNLOADED));
 
   useEffect(() => {
     if (!userId) return;

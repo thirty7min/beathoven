@@ -12,6 +12,8 @@ export function phaseLabel(mode: RoomMode, status: RoomStatus): string | null {
       return isUploadOnly(mode) ? "Uploading" : "Producing";
     case "listening":
       return "Listening";
+    case "reviewing":
+      return "Reviewing";
     case "results":
       return "Results";
     default:

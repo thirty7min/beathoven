@@ -7,12 +7,12 @@ import { useAuth } from "./auth-provider";
 
 export const ONLINE_TOPIC = "online";
 
-const OnlineContext = createContext<number | null>(null);
+const OnlineContext = createContext<ReadonlySet<string> | null>(null);
 
 export function PresenceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const [count, setCount] = useState<number | null>(null);
+  const [online, setOnline] = useState<ReadonlySet<string> | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -25,7 +25,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
       channel = supabase.channel(ONLINE_TOPIC, { config: { private: true, presence: { key: userId } } });
       channel
         .on("presence", { event: "sync" }, () => {
-          if (channel) setCount(Object.keys(channel.presenceState()).length);
+          if (channel) setOnline(new Set(Object.keys(channel.presenceState())));
         })
         .subscribe((status) => {
           if (status === "SUBSCRIBED") void channel?.track({ online_at: new Date().toISOString() });
@@ -34,14 +34,19 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
-      setCount(null);
+      setOnline(null);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [userId]);
 
-  return <OnlineContext value={count}>{children}</OnlineContext>;
+  return <OnlineContext value={online}>{children}</OnlineContext>;
 }
 
 export function useOnlineCount() {
-  return use(OnlineContext);
+  return use(OnlineContext)?.size ?? null;
+}
+
+export function useIsOnline(userId: string | null) {
+  const online = use(OnlineContext);
+  return userId !== null && (online?.has(userId) ?? false);
 }

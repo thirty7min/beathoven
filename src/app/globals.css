@@ -31,9 +31,14 @@
   --animate-tooltip: menu 125ms cubic-bezier(0.23, 1, 0.32, 1);
   --animate-drop-in: drop-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
   --animate-swap: swap 150ms cubic-bezier(0.23, 1, 0.32, 1);
+  --animate-ring: ring 200ms cubic-bezier(0.23, 1, 0.32, 1);
   --animate-reveal: reveal 400ms cubic-bezier(0.23, 1, 0.32, 1) both;
   --animate-crossfade: fade 200ms cubic-bezier(0.23, 1, 0.32, 1);
   --animate-grain: grain 600ms steps(1) infinite;
+  --animate-notice: notice 2200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  --animate-lick: lick 1s ease-in-out infinite;
+  --animate-puff: puff 2.4s ease-in-out infinite;
+  --animate-haze: haze 1.8s linear infinite;
 
   @keyframes eq {
     0%, 100% { transform: scaleY(0.2); }
@@ -58,11 +63,34 @@
   @keyframes swap {
     from { transform: scale(0.9); opacity: 0; }
   }
+  @keyframes ring {
+    from { transform: scale(0.85); opacity: 0; }
+  }
   @keyframes reveal {
     from { transform: translateY(8px) scale(0.98); opacity: 0; }
   }
   @keyframes fade {
     from { opacity: 0; }
+  }
+  @keyframes lick {
+    0%, 100% { transform: scaleY(1) skewX(0deg); }
+    33% { transform: scaleY(1.07) skewX(-3deg); }
+    66% { transform: scaleY(0.94) skewX(3deg); }
+  }
+  @keyframes puff {
+    0%, 100% { transform: translateY(0); opacity: 0.75; }
+    50% { transform: translateY(-8%); opacity: 1; }
+  }
+  @keyframes haze {
+    0% { transform: translateY(20%); opacity: 0; }
+    40% { opacity: 1; }
+    100% { transform: translateY(-25%); opacity: 0; }
+  }
+  @keyframes notice {
+    0% { opacity: 0; }
+    7% { opacity: 1; }
+    88% { opacity: 1; }
+    100% { opacity: 0; }
   }
   @keyframes grain {
     0% { transform: translate(0, 0); }
@@ -85,7 +113,8 @@
   .animate-fade-in {
     animation-name: fade;
   }
-  .animate-grain {
+  .animate-grain,
+  .animate-ring {
     animation: none;
   }
 }
@@ -97,6 +126,7 @@
 
 :root {
   color-scheme: dark;
+  scrollbar-gutter: stable;
 }
 
 body {

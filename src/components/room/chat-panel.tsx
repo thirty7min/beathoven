@@ -9,6 +9,7 @@ import { isSystemMessage } from "@/lib/game/kick";
 import type { ChatMessage, RoomPlayer } from "@/lib/game/types";
 import { ProfileCard } from "./profile-card";
 import { useRoomAction } from "./use-room-action";
+import { displayName } from "@/lib/ui/display-name";
 
 const MAX_LENGTH = 500;
 
@@ -19,19 +20,19 @@ export function ChatPanel({
   me,
   hostId,
   players,
-  online,
   onSend,
   className,
   autoFocus,
+  glass = false,
 }: {
   messages: ChatMessage[];
   me: string;
   players: RoomPlayer[];
-  online: string[];
   hostId: string | null;
   onSend: (body: string) => Promise<unknown>;
   className?: string;
   autoFocus?: boolean;
+  glass?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const { pending, run } = useRoomAction();
@@ -86,7 +87,7 @@ export function ChatPanel({
             }
             const grouped = continuesRun(messages[i - 1], m);
             const mine = m.user_id === me;
-            const name = m.username ?? "Unknown player";
+            const name = displayName(m);
             const sender = m.user_id ? (playerById.get(m.user_id) ?? null) : null;
             const openProfile = sender ? () => setSelected(sender) : undefined;
             return (
@@ -114,7 +115,7 @@ export function ChatPanel({
                     </span>
                   )}
                   {isEmojiOnly(m.body) ? (
-                    <p className="text-3xl leading-none">{m.body}</p>
+                    <p className="text-[1.09375rem] leading-[1.203125rem]">{m.body}</p>
                   ) : (
                     <p className="max-w-full text-sm leading-snug break-words whitespace-pre-wrap text-fg">{m.body}</p>
                   )}
@@ -133,7 +134,10 @@ export function ChatPanel({
             autoFocus={autoFocus}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Send a message"
-            className="h-10 min-w-0 flex-1 rounded-full border border-line-strong bg-transparent px-4 text-sm placeholder:text-muted focus:border-fg/60 focus:outline-none"
+            className={cn(
+              "h-10 min-w-0 flex-1 rounded-full border border-line-strong px-4 text-sm transition-[background-color] duration-200 ease-snappy placeholder:text-muted focus:border-fg/60 focus:outline-none",
+              glass ? "bg-black/40" : "bg-transparent",
+            )}
           />
           <button
             type="submit"
@@ -152,7 +156,10 @@ export function ChatPanel({
               onClick={() => void react(emoji)}
               disabled={pending !== null}
               aria-label={`Send ${emoji}`}
-              className="flex h-9 flex-1 items-center justify-center rounded-lg bg-raised text-lg transition hover:bg-hover disabled:opacity-40"
+              className={cn(
+                "flex h-9 flex-1 items-center justify-center rounded-lg text-lg transition disabled:opacity-40",
+                glass ? "bg-white/[0.07] hover:bg-white/[0.12]" : "bg-raised hover:bg-hover",
+              )}
             >
               {emoji}
             </button>
@@ -162,7 +169,6 @@ export function ChatPanel({
       <ProfileCard
         player={selected}
         isHost={selected?.user_id === hostId}
-        online={selected ? selected.is_bot === true || online.includes(selected.user_id) : false}
         onClose={() => setSelected(null)}
       />
     </section>

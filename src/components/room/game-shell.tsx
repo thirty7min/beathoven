@@ -4,9 +4,11 @@ import { LogOut, MessageSquare, PanelLeftClose } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Logo } from "@/components/logo";
 import { VolumeControl } from "@/components/volume-control";
+import { GenreBadge } from "@/components/genre-badge";
 import { ModeBadge } from "@/components/mode-badge";
 import { Button } from "@/components/ui/button";
 import { Eyebrow } from "@/components/ui/card";
+import { cn } from "@/components/ui/cn";
 import { Dialog } from "@/components/ui/dialog";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { activePlayers } from "@/lib/game/lobby";
@@ -15,6 +17,7 @@ import { ChatPanel } from "./chat-panel";
 import { ConnectionBadge, ReconnectingNotice } from "./connection-badge";
 import { PlayerList } from "./player-list";
 import { MobileDock } from "./mobile-dock";
+import { ShellBackdropProvider } from "./shell-backdrop";
 import type { RoomController } from "./types";
 import { useKickActions } from "./use-kick-actions";
 
@@ -39,6 +42,8 @@ export function GameShell({
   const latestId = snapshot.chat.at(-1)?.id ?? 0;
   const [seen, setSeen] = useState(latestId);
   const unread = chatOpen ? 0 : snapshot.chat.filter((m) => m.id > seen && m.user_id !== snapshot.me).length;
+  const [backdrop, setBackdrop] = useState<HTMLDivElement | null>(null);
+  const glass = state.status === "listening";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -57,7 +62,7 @@ export function GameShell({
   return (
     <div className="fixed inset-0 z-40 flex h-dvh flex-col bg-page">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-4">
-        <Logo wordmarkClassName="hidden sm:inline" />
+        <Logo collapse />
         <span className="min-w-0 truncate text-sm text-muted lg:hidden">{state.name || `Room ${state.code}`}</span>
         <div className="ml-auto flex items-center gap-1">
           <VolumeControl />
@@ -71,9 +76,10 @@ export function GameShell({
 
       {room.connection === "reconnecting" && <ReconnectingNotice className="rounded-none border-x-0 border-t-0" />}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="relative flex min-h-0 flex-1">
+        <div ref={setBackdrop} className="absolute inset-0 -z-10" />
         {chatOpen ? (
-          <aside className="hidden w-[320px] shrink-0 flex-col border-r border-line lg:flex">
+          <aside className={cn("hidden w-[320px] shrink-0 flex-col border-r border-line lg:flex", panelSurface(glass))}>
             <div className="flex items-center justify-between px-4 pt-4 pb-1">
               <Eyebrow>Chat</Eyebrow>
               <button
@@ -84,13 +90,16 @@ export function GameShell({
                 <PanelLeftClose className="h-4 w-4" />
               </button>
             </div>
-            <ChatPanel messages={snapshot.chat} me={snapshot.me} hostId={state.host_id} players={snapshot.players} online={room.online} onSend={room.actions.sendChat} className="flex-1" />
+            <ChatPanel messages={snapshot.chat} me={snapshot.me} hostId={state.host_id} players={snapshot.players} onSend={room.actions.sendChat} glass={glass} className="flex-1" />
           </aside>
         ) : (
           <button
             onClick={toggleChat}
             aria-label={unread ? `Show chat, ${unread} unread` : "Show chat"}
-            className="hidden w-10 shrink-0 flex-col items-center justify-center gap-3 border-r border-line text-muted transition hover:bg-white/[0.03] hover:text-fg lg:flex"
+            className={cn(
+              "hidden w-10 shrink-0 flex-col items-center justify-center gap-3 border-r border-line text-muted transition-[background-color,color] duration-200 ease-snappy hover:text-fg lg:flex",
+              glass ? "bg-black/50 backdrop-blur-lg hover:bg-black/40" : "bg-page hover:bg-white/[0.03]",
+            )}
           >
             <MessageSquare className="h-4 w-4" />
             <span className="text-[11px] font-semibold tracking-[0.2em] uppercase [writing-mode:vertical-rl]">Chat</span>
@@ -102,9 +111,11 @@ export function GameShell({
           </button>
         )}
 
-        <main className="scrollbar-thin relative min-w-0 flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
+        <main className="scrollbar-thin relative min-w-0 flex-1 overflow-y-auto pb-20 lg:pb-0">
+          <ShellBackdropProvider value={backdrop}>{children}</ShellBackdropProvider>
+        </main>
 
-        <aside className="hidden w-[300px] shrink-0 flex-col border-l border-line lg:flex xl:w-[320px]">
+        <aside className={cn("hidden w-[300px] shrink-0 flex-col border-l border-line lg:flex xl:w-[320px]", panelSurface(glass))}>
           <RoomInfo snapshot={snapshot} />
           <div className="flex min-h-0 flex-1 flex-col border-t border-line px-5 pt-4">
             <div className="flex items-center justify-between pb-1">
@@ -113,12 +124,12 @@ export function GameShell({
                 {activePlayers(snapshot.players).length}/{state.max_players}
               </span>
             </div>
-            <PlayerList snapshot={snapshot} online={room.online} className="min-h-0 flex-1 pb-3" now={serverNow} {...kick} />
+            <PlayerList snapshot={snapshot} className="min-h-0 flex-1 pb-3" now={serverNow} {...kick} />
           </div>
         </aside>
       </div>
 
-      <MobileDock snapshot={snapshot} online={room.online} onSend={room.actions.sendChat} now={serverNow} {...kick} />
+      <MobileDock snapshot={snapshot} onSend={room.actions.sendChat} now={serverNow} glass={glass} {...kick} />
 
       <Dialog open={confirmLeave && leaveNeedsConfirm(state.status)} onClose={() => setConfirmLeave(false)} title="Leave this game?">
         <p className="text-sm text-muted">The game is still going. If you leave now you&apos;ll miss the rest and can&apos;t rejoin until it ends.</p>
@@ -135,6 +146,10 @@ export function GameShell({
   );
 }
 
+function panelSurface(glass: boolean) {
+  return cn("transition-[background-color] duration-200 ease-snappy", glass ? "bg-black/50 backdrop-blur-lg" : "bg-page");
+}
+
 function RoomInfo({ snapshot }: { snapshot: RoomSnapshot }) {
   const { room } = snapshot;
   const prompt = room.mode === "creative" ? snapshot.assets.find((a) => a.kind === "prompt")?.prompt : null;
@@ -145,6 +160,7 @@ function RoomInfo({ snapshot }: { snapshot: RoomSnapshot }) {
         <p className="truncate text-lg leading-tight font-bold">{room.name || `Room ${room.code}`}</p>
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
           <ModeBadge room={room} />
+          <GenreBadge genre={room.genre} />
           <span className="font-mono tracking-wider">{room.code}</span>
         </div>
       </div>

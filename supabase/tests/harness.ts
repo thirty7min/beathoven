@@ -98,11 +98,32 @@ export async function verifiedUpload(db: TestDb, userId: string, roomId: string,
   return { uploadId, finalPath };
 }
 
-export async function submitVerified(db: TestDb, userId: string, roomId: string, durationMs = 60000) {
+export async function submitVerified(
+  db: TestDb,
+  userId: string,
+  roomId: string,
+  durationMs = 60000,
+  { confirm = true }: { confirm?: boolean } = {},
+) {
   const { uploadId } = await verifiedUpload(db, userId, roomId, durationMs);
   const result = await rpc<{ submission_id: string }>(db, userId, "submit_track", {
     p_room_id: roomId,
     p_upload_id: uploadId,
   });
+  if (confirm) await confirmDefaultClip(db, userId, roomId, durationMs);
   return result.submission_id;
+}
+
+export async function confirmDefaultClip(db: TestDb, userId: string, roomId: string, durationMs: number) {
+  const { rows } = await db.query<{ listen_seconds: number }>("select listen_seconds from public.rooms where id = $1", [roomId]);
+  return rpc(db, userId, "confirm_submission", {
+    p_room_id: roomId,
+    p_clip_start_ms: 0,
+    p_clip_end_ms: Math.min(durationMs, rows[0].listen_seconds * 1000),
+  });
+}
+
+export async function endReview(db: TestDb, roomId: string) {
+  await db.query("update public.rooms set phase_ends_at = now() - interval '1 second' where id = $1 and status = 'reviewing'", [roomId]);
+  await db.query("select public.sweep_rooms()");
 }

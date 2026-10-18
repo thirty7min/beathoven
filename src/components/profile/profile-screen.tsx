@@ -1,8 +1,8 @@
 "use client";
 
-import { Pencil, Trophy } from "lucide-react";
+import { CalendarDays, Pencil, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { EmptyState, LobbyListSkeleton } from "@/components/home/lobby-list";
 import { ModeIcon } from "@/components/home/mode-icon";
@@ -12,14 +12,17 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ListRow, ListTable, Thumb } from "@/components/ui/list";
 import { StatStrip } from "@/components/ui/stat-strip";
-import { Tabs } from "@/components/ui/tabs";
+import { TabPanels, Tabs } from "@/components/ui/tabs";
 import { useProfile, type RoundHistoryItem } from "@/hooks/use-profile";
 import { formatScore } from "@/lib/game/format";
 import { modeName } from "@/lib/game/room-settings";
+import { joinedLabel } from "@/lib/ui/joined";
 import type { ListColumn } from "@/lib/ui/list-columns";
 import { DawList } from "./daw-badge";
 import { ProfileEditor } from "./profile-editor";
 import { ProfileLink } from "./profile-link";
+import { TopTracks } from "./top-tracks";
+import { displayName } from "@/lib/ui/display-name";
 
 const COLUMNS: ListColumn[] = [
   { label: "Battle", width: "minmax(0,1fr)" },
@@ -34,6 +37,8 @@ export function ProfileScreen({ username }: { username: string }) {
   const { user } = useAuth();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [section, setSection] = useState<"recent" | "tracks">("recent");
+  const tabIds = useId();
 
   if (state.status === "loading") {
     return <div className="h-72 animate-pulse rounded-2xl border border-line bg-surface" />;
@@ -52,17 +57,25 @@ export function ProfileScreen({ username }: { username: string }) {
   const { profile, history } = state;
   const isOwner = user?.id === profile.id;
   const winRate = profile.games_played ? Math.round((profile.wins / profile.games_played) * 100) : null;
+  const joined = joinedLabel(profile.created_at);
 
   return (
     <div className="flex flex-col gap-10">
       <Card className="flex flex-col gap-8 p-6 sm:p-8">
         <div className="flex flex-wrap items-start gap-6">
-          <Avatar name={profile.username} url={profile.avatar_url} seed={profile.id} size="xl" />
+          <Avatar name={displayName(profile)} url={profile.avatar_url} seed={profile.id} size="xl" />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">{profile.username}</h1>
-              <p className="text-sm text-muted">
-                Producing since {new Date(profile.created_at).toLocaleDateString([], { month: "short", year: "numeric" })}
+            <div className="flex min-w-0 flex-col gap-1">
+              <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">{displayName(profile)}</h1>
+              <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+                <span className="truncate">@{profile.username}</span>
+                {joined && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <CalendarDays aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                    <span className="shrink-0">{joined}</span>
+                  </>
+                )}
               </p>
             </div>
             {profile.bio ? (
@@ -95,23 +108,43 @@ export function ProfileScreen({ username }: { username: string }) {
       </Card>
 
       <section className="flex flex-col gap-5">
-        <Tabs label="Profile sections" items={[{ id: "recent", label: "Recent battles" }]} active="recent" />
-        {history === null ? (
-          <LobbyListSkeleton rows={3} />
-        ) : history.length === 0 ? (
-          <EmptyState>
-            {isOwner ? "No finished battles yet. Your results will show up here." : "No shared battles to show yet."}
-          </EmptyState>
-        ) : (
-          <div>
-            <ListTable columns={COLUMNS}>
-              {history.map((item) => (
-                <HistoryRow key={item.key} item={item} />
-              ))}
-            </ListTable>
-            {!isOwner && <p className="mt-4 text-xs text-subtle">Showing battles you were both part of.</p>}
-          </div>
-        )}
+        <Tabs
+          label="Profile sections"
+          items={[
+            { id: "recent", label: "Recent battles" },
+            { id: "tracks", label: "Top tracks" },
+          ]}
+          active={section}
+          onChange={setSection}
+          ids={tabIds}
+        />
+        <TabPanels
+          active={section}
+          ids={tabIds}
+          panels={[
+            {
+              id: "recent",
+              content:
+                history === null ? (
+                  <LobbyListSkeleton rows={3} />
+                ) : history.length === 0 ? (
+                  <EmptyState>
+                    {isOwner ? "No finished battles yet. Your results will show up here." : "No shared battles to show yet."}
+                  </EmptyState>
+                ) : (
+                  <div>
+                    <ListTable columns={COLUMNS}>
+                      {history.map((item) => (
+                        <HistoryRow key={item.key} item={item} />
+                      ))}
+                    </ListTable>
+                    {!isOwner && <p className="mt-4 text-xs text-subtle">Showing battles you were both part of.</p>}
+                  </div>
+                ),
+            },
+            { id: "tracks", content: <TopTracks username={profile.username} isOwner={isOwner} visible={section === "tracks"} /> },
+          ]}
+        />
       </section>
 
       {isOwner && editing && (

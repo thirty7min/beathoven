@@ -1,5 +1,6 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 import type { SubmitResult } from "@/lib/game/rpc";
+import { LOUDNESS_BOOST_ENABLED } from "@/lib/features";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { processSubmissionAudio } from "@/lib/tracks/process";
 import { defaultTrackTitle } from "@/lib/tracks/title";
@@ -13,6 +14,8 @@ import {
   uploadError,
 } from "@/lib/uploads/server";
 import { verifyUpload } from "@/lib/uploads/verify";
+
+export const maxDuration = 120;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -75,13 +78,26 @@ export async function POST(request: NextRequest) {
     const result = submitted.data as SubmitResult;
     if (result.replaced_path) await submissions.remove([result.replaced_path]);
     after(() =>
-      processSubmissionAudio(admin, {
-        submissionId: result.submission_id,
-        storagePath: finalPath,
-        bytes: verdict.bytes,
-        ext: verdict.ext,
-        titleHint: defaultTrackTitle(verdict.title, fileName),
-      }).catch((error) => console.error("track matching failed", error)),
+      Promise.all([
+        processSubmissionAudio(admin, {
+          submissionId: result.submission_id,
+          storagePath: finalPath,
+          bytes: verdict.bytes,
+          ext: verdict.ext,
+          titleHint: defaultTrackTitle(verdict.title, fileName),
+        }).catch((error) => console.error("track matching failed", error)),
+        LOUDNESS_BOOST_ENABLED &&
+          import("@/lib/uploads/measure")
+            .then(({ recordSubmissionLoudness }) =>
+              recordSubmissionLoudness(admin, {
+                submissionId: result.submission_id,
+                storagePath: finalPath,
+                bytes: verdict.bytes,
+                ext: verdict.ext,
+              }),
+            )
+            .catch((error) => console.error("loudness measurement failed", error)),
+      ]),
     );
     return NextResponse.json({ uploadId, submissionId: result.submission_id, durationMs: verdict.durationMs });
   } finally {

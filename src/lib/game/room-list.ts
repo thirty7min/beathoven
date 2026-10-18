@@ -6,16 +6,17 @@ import type { PublicRoom } from "./types";
 
 export const ROOM_NAME_MAX = 40;
 
-export function roomTitle(room: Pick<PublicRoom, "name" | "host_username">): string {
+export function roomTitle(room: Pick<PublicRoom, "name" | "host_username" | "host_display_name">): string {
   const name = room.name?.trim();
   if (name) return name;
-  return room.host_username ? `${room.host_username}'s room` : "Open room";
+  const host = room.host_display_name ?? room.host_username;
+  return host ? `${host}'s room` : "Open room";
 }
 
 export function splitRooms<T extends Pick<PublicRoom, "status">>(rooms: T[]) {
   return {
     open: rooms.filter((r) => r.status === "lobby"),
-    inProgress: rooms.filter((r) => r.status === "producing" || r.status === "listening" || r.status === "results"),
+    inProgress: rooms.filter((r) => r.status !== "lobby" && r.status !== "closed"),
   };
 }
 

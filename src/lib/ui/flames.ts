@@ -21,7 +21,7 @@ const LEVELS: Record<number, FlameLevel> = {
   5: { fire: 1, smoke: 0, embers: 1 },
 };
 
-export const FIRE_BOX = { left: -2.4, right: 2.4, bottom: -1.2, top: 4 };
+export const FIRE_BOX = { left: -3.1, right: 3.1, bottom: -1.2, top: 4 };
 export const EDGE_FADE = 0.3;
 export const BADGE_BORDER_PX = 1.5;
 export const EDGE_AA_PX = 1.5;
@@ -43,10 +43,13 @@ export const NOISE_OCTAVES = 3;
 export const ENVELOPE_LIMIT = 1.25;
 export const FLAME_FLICKER = 0.06;
 export const FLAME_SWAY = 0.3;
+export const TONGUE_SPREAD = 0.3;
 export const EMBER_COUNT = 5;
 export const EMBER_RADIUS = 0.1;
 export const SMOKE_PUFFS = 3;
 export const GLOW_ALPHA = 0.28;
+export const CORONA_PROFILE = { side: -0.1, top: 1, fadeFrom: -0.8, fadeTo: -0.25 };
+export const RIM_HEAT = { cold: 0.3, hot: 0.85 };
 
 export function flameLevel(score: number | null): FlameLevel {
   if (score === null || !Number.isFinite(score)) return COLD;
@@ -83,22 +86,40 @@ export function createFlameShape(): FlameShape {
 
 export function flameShape(fire: number, out: FlameShape = createFlameShape()): FlameShape {
   const f = clamp01(fire);
-  out.height = 1.15 + 1.6 * f;
-  out.width = 1.08 + 0.32 * f;
+  out.height = 0.3 + 1.05 * f;
+  out.width = 0.15 + 0.65 * f;
   out.speed = 0.9 + 1.6 * f;
   out.opacity = Math.min(1, f / 0.1);
   out.glow = f;
   out.rim = Math.min(1, f * 1.6);
-  out.front = clamp01((f - 0.25) / 0.75);
+  out.front = clamp01((f - 0.4) / 0.6);
   out.tint = f * f;
   return out;
 }
 
+function smoothstep(from: number, to: number, value: number) {
+  const t = clamp01((value - from) / (to - from));
+  return t * t * (3 - 2 * t);
+}
+
+export function coronaLength(shape: FlameShape, up: number): number {
+  const { side, top, fadeFrom, fadeTo } = CORONA_PROFILE;
+  const length = shape.width + (shape.height - shape.width) * smoothstep(side, top, up);
+  return length * smoothstep(fadeFrom, fadeTo, up);
+}
+
+export function rimHeat(fire: number): number {
+  return RIM_HEAT.cold + (RIM_HEAT.hot - RIM_HEAT.cold) * clamp01(fire);
+}
+
 export function flameReach(shape: FlameShape) {
-  return {
-    top: shape.height * (1 + FLAME_FLICKER) * ENVELOPE_LIMIT,
-    side: shape.width * ENVELOPE_LIMIT + FLAME_SWAY,
-  };
+  const stretch = (1 + FLAME_FLICKER) * ENVELOPE_LIMIT * (1 + TONGUE_SPREAD);
+  let side = 0;
+  for (let degrees = -90; degrees <= 90; degrees++) {
+    const angle = (degrees * Math.PI) / 180;
+    side = Math.max(side, (1 + coronaLength(shape, Math.sin(angle)) * stretch) * Math.cos(angle));
+  }
+  return { top: 1 + coronaLength(shape, 1) * stretch, side: side + FLAME_SWAY / 2 };
 }
 
 export type BadgeEdge = { cut: number; aa: number };

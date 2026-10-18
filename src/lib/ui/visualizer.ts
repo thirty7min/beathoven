@@ -32,8 +32,8 @@ export function cycleStyle(style: VisualizerStyle, direction: 1 | -1): Visualize
   return VISUALIZER_STYLES[(index + direction + VISUALIZER_STYLES.length) % VISUALIZER_STYLES.length];
 }
 
-export function parsePrefs(raw: string | null, reducedMotion: boolean): VisualizerPrefs {
-  const fallback: VisualizerPrefs = { on: !reducedMotion, style: VISUALIZER_STYLES[0] };
+export function parsePrefs(raw: string | null): VisualizerPrefs {
+  const fallback: VisualizerPrefs = { on: false, style: VISUALIZER_STYLES[0] };
   if (!raw) return fallback;
   try {
     const parsed = JSON.parse(raw) as Partial<VisualizerPrefs>;
@@ -44,9 +44,14 @@ export function parsePrefs(raw: string | null, reducedMotion: boolean): Visualiz
   }
 }
 
-function bandAverage(frequencies: Uint8Array, binHz: number, fromHz: number, toHz: number): number {
+export function bandBins(binHz: number, fromHz: number, toHz: number, binCount: number): [start: number, end: number] {
   const start = Math.max(0, Math.floor(fromHz / binHz));
-  const end = Math.min(frequencies.length, Math.max(start + 1, Math.ceil(toHz / binHz)));
+  const end = Math.min(binCount, Math.max(start + 1, Math.ceil(toHz / binHz)));
+  return [start, end];
+}
+
+function bandAverage(frequencies: Uint8Array, binHz: number, fromHz: number, toHz: number): number {
+  const [start, end] = bandBins(binHz, fromHz, toHz, frequencies.length);
   if (end <= start) return 0;
   let sum = 0;
   for (let i = start; i < end; i++) sum += frequencies[i];
@@ -73,6 +78,22 @@ export function smoothBands(current: Bands, target: Bands, elapsedMs: number): B
   return current;
 }
 
+export const BEAT_GAIN = 1.1;
+
+export type Levels = { pulse: number; mid: number; shimmer: number };
+
+export function reactiveLevels(bands: Bands, reducedMotion: boolean, out: Levels): Levels {
+  out.pulse = reducedMotion ? 0 : bands.bass * BEAT_GAIN;
+  out.mid = reducedMotion ? 0 : bands.mid;
+  out.shimmer = reducedMotion ? 0 : bands.high;
+  return out;
+}
+
+export function isSilentSpectrum(frequencies: Uint8Array): boolean {
+  for (let i = 0; i < frequencies.length; i++) if (frequencies[i] !== 0) return false;
+  return true;
+}
+
 export function flowSpeed(mid: number, reducedMotion: boolean): number {
   return reducedMotion ? 0.06 : 0.18 + mid * 0.9;
 }
@@ -82,4 +103,17 @@ export type WebglSetup = "ready" | "no-context" | "failed";
 export function canvasFallback(setup: WebglSetup): "none" | "same-canvas" | "fresh-canvas" {
   if (setup === "ready") return "none";
   return setup === "no-context" ? "same-canvas" : "fresh-canvas";
+}
+
+export const STYLE_BLEND_MS = 800;
+export const STYLE_BLEND_REDUCED_MS = 150;
+
+export function easeInOutCubic(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
+
+export function blendMix(elapsedMs: number, durationMs: number): number {
+  if (durationMs <= 0) return 1;
+  return easeInOutCubic(elapsedMs / durationMs);
 }

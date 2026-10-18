@@ -7,10 +7,12 @@ import { useAuth } from "@/components/auth-provider";
 import { LeaveRoomDialog } from "@/components/leave-room-dialog";
 import { Button } from "@/components/ui/button";
 import { useCurrentRoom } from "@/hooks/use-current-room";
+import { useOnHide } from "@/hooks/use-on-hide";
 import { createRoom } from "@/lib/game/rpc";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { DEFAULT_DRAFT, RoomSettingsForm, type RoomSettingsDraft } from "./room-settings-form";
 import { notifyError } from "@/lib/ui/notify";
+import { displayName } from "@/lib/ui/display-name";
 
 export function CreateRoom({ showHeading = true }: { showHeading?: boolean }) {
   const router = useRouter();
@@ -19,6 +21,10 @@ export function CreateRoom({ showHeading = true }: { showHeading?: boolean }) {
   const [draft, setDraft] = useState<RoomSettingsDraft>(DEFAULT_DRAFT);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  useOnHide(() => {
+    setBusy(false);
+    setConfirming(false);
+  });
 
   async function create() {
     setBusy(true);
@@ -41,7 +47,7 @@ export function CreateRoom({ showHeading = true }: { showHeading?: boolean }) {
           <p className="text-sm text-muted">Pick a mode, set the clock, share the code.</p>
         </div>
       )}
-      <RoomSettingsForm value={draft} onChange={setDraft} namePlaceholder={profile ? `${profile.username}'s room` : undefined} />
+      <RoomSettingsForm value={draft} onChange={setDraft} autoFocusName namePlaceholder={profile ? `${displayName(profile)}'s room` : undefined} />
       <div>
         <Button variant="primary" size="lg" className="w-full" loading={busy} onClick={() => (currentRoom ? setConfirming(true) : void create())}>
           <Plus className="h-4 w-4" />

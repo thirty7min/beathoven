@@ -75,6 +75,8 @@ function withPublicState(snapshot: RoomSnapshot, state: RoomState): RoomSnapshot
     current_votes: state.current_votes,
     skip: state.skip,
     kick_votes: state.kick_votes,
+    review: state.review,
+    my_review: sameRound && state.room.status === "reviewing" ? snapshot.my_review : null,
     my_votes: sameRound ? snapshot.my_votes : [],
     my_submission: sameRound ? snapshot.my_submission : null,
     my_skip_votes: sameRound ? snapshot.my_skip_votes : [],
@@ -112,7 +114,13 @@ export function roomReducer(view: RoomViewState, action: RoomAction): RoomViewSt
     case "my_vote": {
       const current = view.snapshot;
       if (!current) return view;
-      return { ...view, snapshot: { ...current, my_votes: mergeVotes(current.my_votes, [action.vote]) } };
+      const my_review = current.my_review?.map((entry) =>
+        entry.submission_id === action.vote.submission_id ? { ...entry, my_vote: action.vote.score, is_default: false } : entry,
+      );
+      return {
+        ...view,
+        snapshot: { ...current, my_votes: mergeVotes(current.my_votes, [action.vote]), my_review: my_review ?? current.my_review },
+      };
     }
     case "my_kick_vote": {
       const current = view.snapshot;

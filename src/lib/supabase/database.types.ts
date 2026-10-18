@@ -3,6 +3,7 @@
 // once a hosted project exists.
 
 import type { DawSlug } from "@/lib/profile/daws";
+import type { Genre } from "@/lib/game/genres";
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
@@ -14,7 +15,7 @@ type Table<Row, Required extends keyof Row = never> = {
 };
 
 export type RoomMode = "classic" | "premade" | "creative";
-export type RoomStatus = "lobby" | "producing" | "listening" | "results" | "closed";
+export type RoomStatus = "lobby" | "producing" | "listening" | "reviewing" | "results" | "closed";
 export type SampleCategory =
   | "kick"
   | "snare"
@@ -36,6 +37,8 @@ export type Database = {
         {
           id: string;
           username: string;
+          display_name: string;
+          onboarded_at: string | null;
           avatar_url: string | null;
           bio: string;
           daws: DawSlug[];
@@ -73,6 +76,7 @@ export type Database = {
           name: string;
           host_id: string | null;
           mode: RoomMode;
+          genre: Genre;
           max_players: number;
           produce_seconds: number;
           /** @deprecated ignored by the server */
@@ -87,6 +91,7 @@ export type Database = {
           track_order: string[];
           current_track: number | null;
           track_started_at: string | null;
+          autostart_at: string | null;
           closed_track_id: string | null;
           closed_track_at: string | null;
           version: number;
@@ -131,6 +136,15 @@ export type Database = {
           track_id: string | null;
           match_source: "exact" | "fingerprint" | "manual" | null;
           match_score: number | null;
+          confirmed: boolean;
+          clip_start_ms: number | null;
+          clip_end_ms: number | null;
+          peaks: number[] | null;
+          loudness_lufs: number | null;
+          true_peak_dbtp: number | null;
+          loudness_status: "pending" | "done" | "failed";
+          loudness_attempts: number;
+          loudness_boost: boolean;
         },
         "room_id" | "round" | "user_id" | "storage_path" | "duration_ms"
       >;
@@ -197,6 +211,7 @@ export type Database = {
           p_name?: string;
           p_reveal_names?: boolean;
           p_listen_seconds?: number;
+          p_genre?: Genre;
         };
         Returns: Json;
       };
@@ -211,6 +226,7 @@ export type Database = {
         Returns: Json;
       };
       touch_room: { Args: { p_room_id: string }; Returns: undefined };
+      room_heartbeat: { Args: Record<string, never>; Returns: Json };
       reserve_upload: { Args: { p_room_id: string | null; p_kind: "submission" | "avatar" }; Returns: Json };
       upload_hash_blocked: { Args: { p_sha256: string }; Returns: boolean };
       reject_upload: { Args: { p_upload_id: string; p_reason: string }; Returns: undefined };
@@ -271,7 +287,15 @@ export type Database = {
         Returns: { submission_id: string; storage_path: string }[];
       };
       mark_submissions_purged: { Args: { p_ids: string[] }; Returns: undefined };
-      quick_match: { Args: { p_mode: RoomMode }; Returns: Json };
+      queued_submission_object_purges: { Args: { p_limit?: number }; Returns: string[] };
+      clear_submission_object_purges: { Args: { p_paths: string[] }; Returns: undefined };
+      get_track_stream: { Args: { p_track_id: string; p_requester: string }; Returns: Json };
+      record_submission_loudness: {
+        Args: { p_submission_id: string; p_storage_path: string; p_ok: boolean; p_lufs?: number | null; p_true_peak?: number | null };
+        Returns: boolean;
+      };
+      loudness_retry_candidates: { Args: { p_limit?: number }; Returns: { submission_id: string; storage_path: string }[] };
+      quick_match: { Args: { p_mode: RoomMode; p_genre?: Genre }; Returns: Json };
       update_room_settings: {
         Args: {
           p_room_id: string;
@@ -283,6 +307,7 @@ export type Database = {
           p_mode?: RoomMode;
           p_reveal_names?: boolean;
           p_listen_seconds?: number;
+          p_genre?: Genre;
         };
         Returns: undefined;
       };
@@ -292,6 +317,32 @@ export type Database = {
       set_ready: { Args: { p_room_id: string; p_ready: boolean }; Returns: undefined };
       start_game: { Args: { p_room_id: string; p_force?: boolean }; Returns: undefined };
       submit_track: { Args: { p_room_id: string; p_upload_id: string }; Returns: Json };
+      finish_review: { Args: { p_room_id: string }; Returns: Json };
+      username_available: { Args: { p_username: string }; Returns: boolean };
+      complete_onboarding: {
+        Args: { p_display_name: string; p_username: string; p_bio?: string; p_daws?: string[] };
+        Returns: Json;
+      };
+      confirm_submission: {
+        Args: {
+          p_room_id: string;
+          p_clip_start_ms: number;
+          p_clip_end_ms: number;
+          p_peaks?: number[] | null;
+          p_loudness_boost?: boolean | null;
+        };
+        Returns: Json;
+      };
+      set_submission_clip: {
+        Args: {
+          p_room_id: string;
+          p_clip_start_ms: number;
+          p_clip_end_ms: number;
+          p_peaks?: number[] | null;
+          p_loudness_boost?: boolean | null;
+        };
+        Returns: Json;
+      };
       cast_vote: { Args: { p_room_id: string; p_submission_id: string; p_score: number }; Returns: undefined };
       send_chat: { Args: { p_room_id: string; p_body: string }; Returns: number };
       advance_room: { Args: { p_room_id: string }; Returns: Json };

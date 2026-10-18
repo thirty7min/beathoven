@@ -22,17 +22,17 @@ const audio = (over: Partial<AudioStatus> = {}): AudioStatus => ({
   ...over,
 });
 
-const playing = (offsetMs: number, clipMs = submission.duration_ms): Playback => ({ state: "playing", submission, clipMs, offsetMs });
+const playing = (offsetMs: number, clipMs = submission.duration_ms): Playback => ({ state: "playing", submission, clipStartMs: 0, clipMs, offsetMs });
 
 describe("syncAudio", () => {
   it("pauses when nothing should play", () => {
     expect(syncAudio({ state: "idle" }, audio({ paused: false }))).toEqual({ type: "pause", seekToMs: null });
-    expect(syncAudio({ state: "ended", submission, clipMs: 60_000 }, audio({ paused: false }))).toEqual({ type: "pause", seekToMs: null });
+    expect(syncAudio({ state: "ended", submission, clipStartMs: 0, clipMs: 60_000 }, audio({ paused: false }))).toEqual({ type: "pause", seekToMs: null });
     expect(syncAudio({ state: "idle" }, audio())).toEqual({ type: "none" });
   });
 
   it("holds at the start during the lead-in", () => {
-    const pending: Playback = { state: "pending", submission, clipMs: 60_000, startsInMs: 2000 };
+    const pending: Playback = { state: "pending", submission, clipStartMs: 0, clipMs: 60_000, startsInMs: 2000 };
     expect(syncAudio(pending, audio())).toEqual({ type: "none" });
     expect(syncAudio(pending, audio({ currentTimeMs: 500 }))).toEqual({ type: "pause", seekToMs: 0 });
     expect(syncAudio(pending, audio({ paused: false }))).toEqual({ type: "pause", seekToMs: null });
@@ -107,10 +107,10 @@ describe("fadeGain", () => {
 describe("playbackProgress", () => {
   it("reports fraction played", () => {
     expect(playbackProgress({ state: "idle" })).toBe(0);
-    expect(playbackProgress({ state: "pending", submission, clipMs: 60_000, startsInMs: 10 })).toBe(0);
+    expect(playbackProgress({ state: "pending", submission, clipStartMs: 0, clipMs: 60_000, startsInMs: 10 })).toBe(0);
     expect(playbackProgress(playing(30_000))).toBe(0.5);
     expect(playbackProgress(playing(15_000, 30_000))).toBe(0.5);
-    expect(playbackProgress({ state: "ended", submission, clipMs: 60_000 })).toBe(1);
+    expect(playbackProgress({ state: "ended", submission, clipStartMs: 0, clipMs: 60_000 })).toBe(1);
   });
 });
 
@@ -120,5 +120,34 @@ describe("seekPosition", () => {
     expect(seekPosition(-1, 30_000)).toBe(0);
     expect(seekPosition(2, 30_000)).toBe(30_000);
     expect(seekPosition(Number.NaN, 30_000)).toBe(0);
+  });
+});
+
+describe("clip offsets", () => {
+  const clipped = (state: "pending" | "playing", offsetMs = 0): Playback =>
+    state === "pending"
+      ? { state, submission, clipStartMs: 20_000, clipMs: 15_000, startsInMs: 1000 }
+      : { state, submission, clipStartMs: 20_000, clipMs: 15_000, offsetMs };
+
+  it("cues the clip start during the lead-in", () => {
+    expect(syncAudio(clipped("pending"), audio())).toEqual({ type: "pause", seekToMs: 20_000 });
+    expect(syncAudio(clipped("pending"), audio({ currentTimeMs: 20_000 }))).toEqual({ type: "none" });
+  });
+
+  it("syncs to the clip start plus the elapsed offset", () => {
+    expect(syncAudio(clipped("playing", 5_000), audio({ currentTimeMs: 20_000 }))).toEqual({ type: "play", seekToMs: 25_000 });
+    expect(syncAudio(clipped("playing", 5_000), audio({ currentTimeMs: 25_100 }))).toEqual({ type: "play", seekToMs: null });
+    expect(syncAudio(clipped("playing", 14_900), audio({ currentTimeMs: 20_000 }))).toEqual({ type: "none" });
+  });
+
+  it("fades out at the clip end unless the clip reaches the end of the track", () => {
+    expect(fadeGain(clipped("playing", 14_850))).toBeCloseTo(0.5);
+    const tail: Playback = { state: "playing", submission, clipStartMs: 45_000, clipMs: 15_000, offsetMs: 14_900 };
+    expect(fadeGain(tail)).toBe(1);
+  });
+
+  it("maps a waveform click inside the clip", () => {
+    expect(seekPosition(0.5, 15_000, 20_000)).toBe(27_500);
+    expect(seekPosition(Number.NaN, 15_000, 20_000)).toBe(20_000);
   });
 });

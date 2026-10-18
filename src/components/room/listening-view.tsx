@@ -10,20 +10,25 @@ import { useSyncedAudio } from "@/hooks/use-synced-audio";
 import { useVisualizerPrefs } from "@/hooks/use-visualizer-prefs";
 import { useWaveform } from "@/hooks/use-waveform";
 import { formatDuration } from "@/lib/game/audio-file";
-import { clipMs, currentSubmission, playbackPosition } from "@/lib/game/phase";
+import { clipMs, clipStartMs, currentSubmission, playbackPosition } from "@/lib/game/phase";
 import { playbackProgress } from "@/lib/game/playback-sync";
 import { isOwnSubmission, revealedProducer } from "@/lib/game/room-extras";
 import { SUBMISSIONS_BUCKET } from "@/lib/game/storage";
 import { isTransientError } from "@/lib/game/error-kind";
 import { sendVoteQuietly, voteState } from "@/lib/game/voting";
 import { shouldShowResumePill } from "@/lib/ui/audio-unlock";
+import { fitFontSize } from "@/lib/ui/headline";
 import { vignetteGradient } from "@/lib/ui/visualizer";
 import { RatingDial } from "./rating-dial";
+import { ShellBackdrop } from "./shell-backdrop";
 import { StageCounter, StageHeader } from "./stage";
 import type { RoomController } from "./types";
 import { useRoomAction } from "./use-room-action";
 import { VisualizerCanvas, VisualizerControl } from "./visualizer";
 import { Waveform } from "./waveform";
+import { displayName } from "@/lib/ui/display-name";
+import { canVoteSkip, skipLabel } from "@/lib/game/skip";
+import { playbackBoostDb } from "@/lib/ui/loudness";
 
 export function ListeningView({ room, serverNow }: { room: RoomController; serverNow: number | null }) {
   const snapshot = room.snapshot!;
@@ -37,9 +42,9 @@ export function ListeningView({ room, serverNow }: { room: RoomController; serve
   const current = useSignedUrl(SUBMISSIONS_BUCKET, submission?.storage_path);
   const upcoming = useSignedUrl(SUBMISSIONS_BUCKET, next?.storage_path);
   const clip = submission ? clipMs(state.listen_seconds, submission) : null;
-  const waveform = useWaveform(submission?.storage_path, current.url, clip);
-  useWaveform(next?.storage_path, upcoming.url, next ? clipMs(state.listen_seconds, next) : null);
-  const audio = useSyncedAudio(playback, current.url);
+  const waveform = useWaveform(submission?.storage_path, current.url, clip, submission ? clipStartMs(submission) : 0);
+  useWaveform(next?.storage_path, upcoming.url, next ? clipMs(state.listen_seconds, next) : null, next ? clipStartMs(next) : 0);
+  const audio = useSyncedAudio(playback, current.url, playbackBoostDb(submission));
   const { muted } = useSound();
   const visualizer = useVisualizerPrefs();
   const { pending: action, run } = useRoomAction();
@@ -78,32 +83,44 @@ export function ListeningView({ room, serverNow }: { room: RoomController; serve
   return (
     <div className="relative isolate flex min-h-full flex-col">
       {visualizer.on && (
-        <div className="absolute inset-0 -z-10 overflow-hidden">
-          <VisualizerCanvas
-            key={visualizer.style}
-            analyser={audio.analyser}
-            playing={playback.state === "playing" && !audio.blocked}
-            style={visualizer.style}
-            reducedMotion={visualizer.reducedMotion}
-          />
-          <div className="absolute inset-0" style={{ backgroundImage: vignetteGradient() }} />
-        </div>
+        <>
+          <ShellBackdrop>
+            <VisualizerCanvas
+              analyser={audio.analyser}
+              playing={playback.state === "playing" && !audio.blocked}
+              style={visualizer.style}
+              reducedMotion={visualizer.reducedMotion}
+            />
+          </ShellBackdrop>
+          <div className="absolute inset-0 -z-10" style={{ backgroundImage: vignetteGradient() }} />
+        </>
       )}
       <StageHeader title="Listening" aside={total > 0 && <StageCounter label="Entry" value={`${index + 1}/${total}`} />} />
 
       <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col items-center justify-center gap-8 px-5 py-6 sm:px-8">
-        <div className="flex max-w-full flex-col items-center gap-3 text-center">
+        <div className="flex w-full max-w-full flex-col items-center gap-3 text-center">
           <span className="text-[11px] font-semibold tracking-[0.2em] text-muted uppercase">{status}</span>
-          <p className="flex max-w-full items-center gap-4 text-[clamp(2.5rem,8vw,5.5rem)] leading-none font-black tracking-tight">
-            {producer ? (
-              <>
-                <Avatar name={producer.username} url={producer.avatar_url} seed={producer.user_id} size="lg" className="shrink-0" />
-                <span className="truncate">{producer.username}</span>
-              </>
-            ) : (
-              `Entry ${index + 1}`
-            )}
-          </p>
+          <div className="@container flex w-full justify-center">
+            <p
+              className="flex max-w-full min-w-0 items-center gap-[0.2em] leading-tight font-black tracking-tight"
+              style={{
+                fontSize: producer
+                  ? fitFontSize([displayName(producer)], { minRem: 1.875, maxRem: 5.5, capCqi: 13, share: 0.96, singleLine: true, extraEm: 1.2 })
+                  : "clamp(2.5rem,8vw,5.5rem)",
+              }}
+            >
+              {producer ? (
+                <>
+                  <Avatar name={displayName(producer)} url={producer.avatar_url} seed={producer.user_id} size="fluid" className="size-[0.8em] animate-pop" />
+                  <span className="min-w-0 flex-1 truncate" title={displayName(producer)}>
+                    {displayName(producer)}
+                  </span>
+                </>
+              ) : (
+                `Entry ${index + 1}`
+              )}
+            </p>
+          </div>
           {isMine && <HighlightPill>Your track</HighlightPill>}
         </div>
 
@@ -129,22 +146,17 @@ export function ListeningView({ room, serverNow }: { room: RoomController; serve
         <div className="fixed right-5 bottom-20 z-10 lg:right-[calc(300px+1.5rem)] lg:bottom-6 xl:right-[calc(320px+1.5rem)]">
           <button
             type="button"
-            disabled={isMine || skip.you_voted === true || action === "skip"}
+            disabled={!canVoteSkip(skip, submission?.id) || action === "skip"}
             aria-pressed={skip.you_voted === true}
             onClick={() => run("skip", room.actions.skipTrack)}
-            title={isMine ? "You can't skip your own entry" : undefined}
             className={cn(
               "flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold shadow-2xl transition-[transform,background-color,border-color,color] duration-150 ease-snappy active:scale-[0.97] disabled:active:scale-100",
               skip.you_voted ? "border-fg bg-white/[0.12] text-fg" : "border-line-strong bg-surface text-fg hover:border-fg",
-              isMine && "opacity-40",
             )}
           >
-            Skip
+            <span className="tabular-nums">{skipLabel(skip)}</span>
             <span key={skip.you_voted ? "on" : "off"} className="inline-flex animate-swap items-center">
               {skip.you_voted && <Check className="h-3.5 w-3.5" />}
-            </span>
-            <span className="text-muted tabular-nums">
-              {skip.votes}/{skip.needed}
             </span>
           </button>
         </div>
