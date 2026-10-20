@@ -7,9 +7,11 @@ Notable changes to Beathoven. The format follows [Keep a Changelog](https://keep
 ### Added
 
 - Cookie-free page view analytics, noted in the Privacy Policy.
+- Emoji shortcodes in chat: type `:sob:` to get 😭, or type `:` and two letters to pick from suggestions.
 
 ### Changed
 
+- Chat stays scrolled to the newest message when you're at the bottom, and shows a "New messages" button when you've scrolled up.
 - Guests now pick a display name, and get a random username automatically.
 
 ## [0.1.0] - 2026-10-18

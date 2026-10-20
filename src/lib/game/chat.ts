@@ -1,4 +1,4 @@
-const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}(?:️|‍\p{Extended_Pictographic}|\p{Emoji_Modifier})*\s*){1,3}$/u;
+const EMOJI_ONLY = /^(?:(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic}|\p{Emoji_Modifier})*|\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3)\s*){1,3}$/u;
 
 type RunMessage = { user_id: string | null; created_at: string; kind?: string };
 

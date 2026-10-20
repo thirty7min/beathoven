@@ -3,7 +3,7 @@ import { continuesRun, isEmojiOnly } from "./chat";
 
 describe("isEmojiOnly", () => {
   it("accepts quick reactions and short emoji runs", () => {
-    for (const emoji of ["🔥", "💀", "❤️", "👋", "🎵", "🔥🔥", "👋🏽", "👨‍🎤", " 🔥 🔥 "]) expect(isEmojiOnly(emoji)).toBe(true);
+    for (const emoji of ["🔥", "💀", "❤️", "👋", "🎵", "🔥🔥", "👋🏽", "👨‍🎤", " 🔥 🔥 ", "🇺🇸", "1️⃣", "❤️❤️"]) expect(isEmojiOnly(emoji)).toBe(true);
   });
 
   it("rejects text, long runs and digits", () => {
