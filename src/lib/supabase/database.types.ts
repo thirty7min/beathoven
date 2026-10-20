@@ -108,6 +108,9 @@ export type Database = {
           joined_at: string;
           left_at: string | null;
           last_seen_at: string;
+          leave_pending_at: string | null;
+          tab_id: string | null;
+          sort_key: number;
           is_ready: boolean;
           role: RoomRole;
         },
@@ -219,6 +222,7 @@ export type Database = {
       };
       skip_track: { Args: { p_room_id: string }; Returns: Json };
       kick_player: { Args: { p_room_id: string; p_user_id: string }; Returns: undefined };
+      transfer_host: { Args: { p_room_id: string; p_user_id: string }; Returns: undefined };
       vote_kick: { Args: { p_room_id: string; p_target: string }; Returns: Json };
       dev_tools_enabled: { Args: Record<string, never>; Returns: boolean };
       dev_add_bot: { Args: { p_room_id: string }; Returns: Json };
@@ -228,7 +232,9 @@ export type Database = {
         Returns: Json;
       };
       touch_room: { Args: { p_room_id: string }; Returns: undefined };
-      room_heartbeat: { Args: Record<string, never>; Returns: Json };
+      room_heartbeat: { Args: { p_tab_id?: string }; Returns: Json };
+      mark_leave_pending: { Args: { p_tab_id?: string }; Returns: boolean };
+      reap_member: { Args: { p_room_id: string; p_user_id: string }; Returns: Json };
       reserve_upload: { Args: { p_room_id: string | null; p_kind: "submission" | "avatar" }; Returns: Json };
       upload_hash_blocked: { Args: { p_sha256: string }; Returns: boolean };
       reject_upload: { Args: { p_upload_id: string; p_reason: string }; Returns: undefined };

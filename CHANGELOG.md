@@ -8,11 +8,16 @@ Notable changes to Beathoven. The format follows [Keep a Changelog](https://keep
 
 - Cookie-free page view analytics, noted in the Privacy Policy.
 - Emoji shortcodes in chat: type `:sob:` to get 😭, or type `:` and two letters to pick from suggestions.
+- Hosts can make another player the host from the player menu in the lobby.
 
 ### Changed
 
 - Chat stays scrolled to the newest message when you're at the bottom, and shows a "New messages" button when you've scrolled up.
 - Guests now pick a display name, and get a random username automatically.
+- Closing the tab or the browser takes you out of the room within a few seconds, in the lobby and mid-game. Refreshing keeps your seat.
+- If you leave during the upload phase and come back before it ends, you get your seat and your upload back. After that you rejoin as a spectator.
+- The host is always listed first, with the previous host right below.
+- Players who go quiet are moved out of the lobby after 90 seconds, and out of the room at the end of a game if they were gone for all of it.
 
 ## [0.1.0] - 2026-10-18
 

@@ -15,12 +15,12 @@ import { useRoom } from "@/hooks/use-room";
 import { useServerNow } from "@/hooks/use-server-now";
 import { friendlyError } from "@/lib/game/error-messages";
 import { joinGateView } from "@/lib/game/join-gate";
-import { isRemovedError, removalMessage, wasRemoved } from "@/lib/game/kick";
+import { isRemovedError, removalDestination, removalMessage, wasRemoved } from "@/lib/game/kick";
 import { leaveNeedsConfirm } from "@/lib/game/leave";
 import { isRoomCode } from "@/lib/game/room-settings";
 import { GameError } from "@/lib/game/errors";
 import { getRoomSnapshot } from "@/lib/game/rpc";
-import { myRole, wasPromoted } from "@/lib/game/spectate";
+import { canReclaimSeat, myRole, wasPromoted } from "@/lib/game/spectate";
 import type { RoomRole } from "@/lib/game/types";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { QUICK_REACTIONS } from "./chat-panel";
@@ -115,13 +115,17 @@ function RoomLive({ code, debug, onRetry }: { code: string; debug: boolean; onRe
         ? Promise.resolve(room.error?.includes("banned_from_room") ?? true)
         : getRoomSnapshot(getBrowserClient(), roomId).then(
             () => false,
-            (error: unknown) => !(error instanceof GameError && error.code === "not_member"),
+            (error: unknown) => error instanceof GameError && error.code === "banned_from_room",
           );
     void banned.then((isBanned) => {
+      if (!isBanned && snapshot && canReclaimSeat(snapshot)) {
+        onRetry();
+        return;
+      }
       toast(removalMessage(isBanned, lastRole.current));
-      router.push("/play");
+      router.push(removalDestination(isBanned));
     });
-  }, [removed, router, room.connection, room.error, snapshot]);
+  }, [removed, router, room.connection, room.error, snapshot, onRetry]);
 
   if (removed) return <RoomSkeleton label="Leaving room…" />;
   if (room.connection === "error") {

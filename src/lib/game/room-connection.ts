@@ -4,6 +4,7 @@ import { Backoff } from "./backoff";
 import { ServerClock } from "./clock";
 import { isTransientError } from "./error-kind";
 import { GameError } from "./errors";
+import { myLeavePending, pendingLeaves } from "./leave";
 import { advanceDueAt } from "./phase";
 import { onlineUserIds, roomReducer, initialRoomViewState, type RoomAction, type RoomViewState } from "./room-store";
 import * as rpc from "./rpc";
@@ -14,6 +15,8 @@ import { decideVersion } from "./version";
 const ADVANCE_JITTER_MS = 400;
 const BROADCAST_GRACE_MS = 1500;
 const RESYNC_HEARTBEAT_MS = 30_000;
+const REAP_JITTER_MS = 500;
+const REAP_RETRIES = 3;
 
 export class RoomConnection {
   readonly clock = new ServerClock();
@@ -36,6 +39,8 @@ export class RoomConnection {
   private readonly reopenBackoff = new Backoff(1000, 15_000);
   private resyncHeartbeat: ReturnType<typeof setInterval> | null = null;
   private detachWindow: (() => void) | null = null;
+  private reapTimers = new Map<string, { markedAt: string; timer: ReturnType<typeof setTimeout> }>();
+  private clearedMark: string | null = null;
 
   constructor(
     private readonly supabase: TypedSupabaseClient,
@@ -140,6 +145,7 @@ export class RoomConnection {
     this.view = next;
     for (const listener of this.listeners) listener();
     this.scheduleAdvance();
+    this.scheduleReaps();
   }
 
   private fail(error: unknown) {
@@ -318,6 +324,44 @@ export class RoomConnection {
     this.advanceTimer = setTimeout(() => void this.tryAdvance(key), this.advanceBackoff.next());
   }
 
+  private scheduleReaps() {
+    const snapshot = this.view.snapshot;
+    const pending = snapshot ? pendingLeaves(snapshot.players, snapshot.me) : [];
+    const pendingIds = new Set(pending.map((leave) => leave.userId));
+    for (const [userId, entry] of this.reapTimers) {
+      if (pendingIds.has(userId)) continue;
+      clearTimeout(entry.timer);
+      this.reapTimers.delete(userId);
+    }
+    for (const leave of pending) {
+      const current = this.reapTimers.get(leave.userId);
+      if (current?.markedAt === leave.markedAt) continue;
+      if (current) clearTimeout(current.timer);
+      this.queueReap(leave.userId, leave.markedAt, Math.max(0, this.clock.toLocal(leave.dueAt) - Date.now()), 0);
+    }
+
+    const mine = snapshot ? myLeavePending(snapshot.players, snapshot.me) : null;
+    if (mine && mine !== this.clearedMark) {
+      this.clearedMark = mine;
+      void this.resync();
+    }
+  }
+
+  private queueReap(userId: string, markedAt: string, delayMs: number, attempt: number) {
+    const timer = setTimeout(() => void this.tryReap(userId, markedAt, attempt), delayMs + Math.random() * REAP_JITTER_MS);
+    this.reapTimers.set(userId, { markedAt, timer });
+  }
+
+  private async tryReap(userId: string, markedAt: string, attempt: number) {
+    const roomId = this.roomId;
+    if (!roomId || this.reapTimers.get(userId)?.markedAt !== markedAt) return;
+    const result = await rpc.reapMember(this.supabase, roomId, userId).catch(() => null);
+    if (this.reapTimers.get(userId)?.markedAt !== markedAt) return;
+    if (result?.retry_in_ms != null && attempt < REAP_RETRIES) {
+      this.queueReap(userId, markedAt, Math.max(0, result.retry_in_ms), attempt + 1);
+    }
+  }
+
   private attachWindow() {
     if (typeof window === "undefined" || this.detachWindow) return;
     const wake = () => {
@@ -340,6 +384,8 @@ export class RoomConnection {
     if (this.reopenTimer) clearTimeout(this.reopenTimer);
     if (this.resyncRetryTimer) clearTimeout(this.resyncRetryTimer);
     if (this.resyncHeartbeat) clearInterval(this.resyncHeartbeat);
+    for (const entry of this.reapTimers.values()) clearTimeout(entry.timer);
+    this.reapTimers.clear();
     this.advanceTimer = null;
     this.reopenTimer = null;
     this.resyncRetryTimer = null;

@@ -176,11 +176,12 @@ describe("create / join / capacity", () => {
     const { players, roomId, code } = await roomWith(3);
     const [outsider] = await users(1);
     await startGame(players[0], roomId);
+    await rpc(db, players[1], "room_heartbeat");
     await rpc(db, players[2], "leave_room", { p_room_id: roomId });
-    expect(await rpc<RoomRef & { role: string }>(db, players[2], "join_room", { p_code: code })).toMatchObject({ role: "spectator" });
-
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });
+    expect(await rpc<RoomRef & { role: string }>(db, players[2], "join_room", { p_code: code })).toMatchObject({ role: "spectator" });
+
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });
     expect((await snapshot(players[0], roomId)).room.status).toBe("lobby");
@@ -363,6 +364,7 @@ describe("classic samples", () => {
     await seedSamples({ kick: 2, snare: 2, hihat: 2, "808": 2, synth: 6, perc: 2 });
     const { players, roomId } = await roomWith(2, { p_mode: "classic" });
     await startGame(players[0], roomId);
+    await rpc(db, players[1], "room_heartbeat");
     const first = picks(await snapshot(players[0], roomId)).map((x) => x.id);
     await expirePhase(roomId);
     await rpc(db, players[0], "advance_room", { p_room_id: roomId });

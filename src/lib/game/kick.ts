@@ -35,7 +35,11 @@ export function wasRemoved(players: RoomPlayer[], me: string): boolean {
 
 export function removalMessage(banned: boolean, role: RoomRole | null): string {
   if (banned) return "You were removed from the room";
-  return role === "spectator" ? "You stopped watching after being inactive" : "You left the room after being inactive";
+  return role === "spectator" ? "You stopped watching after being inactive" : "You were removed from the room for inactivity";
+}
+
+export function removalDestination(banned: boolean): string {
+  return banned ? "/play" : "/";
 }
 
 const REMOVED_ERRORS = ["banned_from_room", "not_member"];

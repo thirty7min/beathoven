@@ -33,3 +33,14 @@ export function roomAction(room: Pick<PublicRoom, "joinable" | "status">): "join
 export function spectatorLabel(count: number): string {
   return `${count} watching`;
 }
+
+export function canReclaimSeat(snapshot: Pick<RoomSnapshot, "players" | "me" | "room">): boolean {
+  if (snapshot.room.status !== "producing") return false;
+  const me = snapshot.players.find((p) => p.user_id === snapshot.me);
+  return (
+    me !== undefined &&
+    !isSpectator(me) &&
+    me.left_at !== null &&
+    Date.parse(me.left_at) >= Date.parse(snapshot.room.phase_started_at)
+  );
+}

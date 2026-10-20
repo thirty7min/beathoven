@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Suspense, createContext, use, useCallback, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
 import { HEARTBEAT_MS, leavesRoomPage, shouldHeartbeat } from "@/lib/game/active-room";
+import { createTabId, sendLeaveBeacon } from "@/lib/game/leave";
 import { roomHeartbeat } from "@/lib/game/rpc";
 import { startTicker } from "@/lib/game/ticker";
 import type { ActiveRoom } from "@/lib/game/types";
@@ -12,6 +13,9 @@ import { useAuth } from "./auth-provider";
 type ActiveRoomState = { room: ActiveRoom | null; pathname: string | null };
 
 const ActiveRoomContext = createContext<ActiveRoomState>({ room: null, pathname: null });
+
+const TAB_ID = createTabId();
+const TABS_CHANNEL = "beathoven:tabs";
 
 export function ActiveRoomProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -26,7 +30,7 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
   const beat = useEffectEvent(() => {
     if (!userId) return;
     const seq = ++latest.current;
-    void roomHeartbeat(getBrowserClient()).then(
+    void roomHeartbeat(getBrowserClient(), TAB_ID).then(
       (next) => {
         if (seq === latest.current) setState({ userId, room: next });
       },
@@ -53,14 +57,24 @@ export function ActiveRoomProvider({ children }: { children: ReactNode }) {
     const wake = () => {
       if (document.visibilityState === "visible") beat();
     };
+    // Another tab of this user may still be open; its beat outranks this tab's leave beacon.
+    const tabs = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(TABS_CHANNEL);
+    if (tabs) tabs.onmessage = () => beat();
+    const leave = () => {
+      sendLeaveBeacon(TAB_ID);
+      tabs?.postMessage("pagehide");
+    };
     document.addEventListener("visibilitychange", wake);
     window.addEventListener("online", wake);
     window.addEventListener("pageshow", wake);
+    window.addEventListener("pagehide", leave);
     return () => {
       stop();
+      tabs?.close();
       document.removeEventListener("visibilitychange", wake);
       window.removeEventListener("online", wake);
       window.removeEventListener("pageshow", wake);
+      window.removeEventListener("pagehide", leave);
     };
   }, [ticking]);
 

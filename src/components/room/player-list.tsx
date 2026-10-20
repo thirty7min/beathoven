@@ -2,6 +2,7 @@
 
 import { AudioLines, Check, Crown, UserX, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { KebabMenu, type KebabItem } from "@/components/ui/kebab-menu";
 import { cn } from "@/components/ui/cn";
 import { List, ListRow } from "@/components/ui/list";
 import { formatClock } from "@/lib/game/format";
+import { canMakeHost } from "@/lib/game/host";
 import { kickActionFor, kickVoteFor } from "@/lib/game/kick";
 import { activePlayers, hasSubmitted, memberBadge } from "@/lib/game/lobby";
 import { currentSubmission } from "@/lib/game/phase";
@@ -27,6 +29,7 @@ export function PlayerList({
   onRemoveBot,
   onKick,
   onVoteKick,
+  onMakeHost,
 }: {
   snapshot: RoomSnapshot;
   className?: string;
@@ -34,10 +37,13 @@ export function PlayerList({
   onRemoveBot?: (userId: string) => void;
   onKick?: (userId: string) => Promise<unknown>;
   onVoteKick?: (userId: string) => void;
+  onMakeHost?: (userId: string) => Promise<boolean>;
 }) {
   const [selected, setSelected] = useState<RoomPlayer | null>(null);
   const [kicking, setKicking] = useState<RoomPlayer | null>(null);
   const [kickBusy, setKickBusy] = useState(false);
+  const [promoting, setPromoting] = useState<RoomPlayer | null>(null);
+  const [promoteBusy, setPromoteBusy] = useState(false);
   const players = activePlayers(snapshot.players);
   const spectators = activeSpectators(snapshot.players);
   const playingId = revealedProducer(snapshot, currentSubmission(snapshot.room, snapshot.submissions))?.user_id ?? null;
@@ -53,7 +59,9 @@ export function PlayerList({
             const vote = kickVoteFor(snapshot, player.user_id);
             const voteLeftMs = vote && now != null ? Math.max(0, Date.parse(vote.expires_at) - now) : null;
             const action = kickActionFor(snapshot, player);
-            const menu: KebabItem[] =
+            const hostItem: KebabItem[] =
+              onMakeHost && canMakeHost(snapshot, player) ? [{ label: "Make host", icon: <Crown />, onSelect: () => setPromoting(player) }] : [];
+            const kickItems: KebabItem[] =
               action === "kick" && onKick
                 ? [{ label: "Kick", icon: <UserX />, danger: true, onSelect: () => setKicking(player) }]
                 : action === "vote" && onVoteKick
@@ -61,6 +69,7 @@ export function PlayerList({
                   : action === "voted"
                     ? [{ label: `Voted to kick${vote ? ` (${vote.votes}/${vote.needed})` : ""}`, icon: <Check />, disabled: true, onSelect: () => undefined }]
                     : [];
+            const menu = [...hostItem, ...kickItems];
             return (
               <ListRow
                 key={player.user_id}
@@ -177,6 +186,28 @@ export function PlayerList({
             }}
           >
             Kick
+          </Button>
+        </div>
+      </Dialog>
+      <Dialog open={promoting !== null} onClose={() => setPromoting(null)} title={`Make ${promoting ? displayName(promoting) : ""} the host?`}>
+        <p className="text-sm text-muted">You&apos;ll lose host controls.</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setPromoting(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            loading={promoteBusy}
+            onClick={async () => {
+              if (!promoting || !onMakeHost) return;
+              setPromoteBusy(true);
+              const promoted = await onMakeHost(promoting.user_id);
+              setPromoteBusy(false);
+              setPromoting(null);
+              if (promoted) toast(`${displayName(promoting)} is now the host`);
+            }}
+          >
+            Make host
           </Button>
         </div>
       </Dialog>

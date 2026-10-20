@@ -58,7 +58,7 @@ describe("room_heartbeat", () => {
 
   it("refreshes the active membership and returns the room summary", async () => {
     const { players, roomId, code } = await lobby(3, { p_name: "Late night", p_genre: "trap", p_max_players: 6 });
-    await idleFor(roomId, players[1], 25);
+    await idleFor(roomId, players[1], 85);
     const beat = await heartbeat(players[1]);
     expect(beat).toMatchObject({
       id: roomId,
@@ -81,19 +81,19 @@ describe("room_heartbeat", () => {
 
   it("keeps a lobby member through the sweep while they beat", async () => {
     const { players, roomId } = await lobby(2);
-    await idleFor(roomId, players[1], 25);
+    await idleFor(roomId, players[1], 85);
     await heartbeat(players[1]);
-    await idleFor(roomId, players[1], 25);
+    await idleFor(roomId, players[1], 85);
     await sweep();
     expect((await snapshot(players[0], roomId)).players.every((p) => p.left_at === null)).toBe(true);
   });
 });
 
 describe("lobby idle removal", () => {
-  it("removes lobby members silent for over 30s through the leave path", async () => {
+  it("removes lobby members silent for over 90 seconds through the leave path", async () => {
     const { players, roomId } = await lobby(3);
-    await idleFor(roomId, players[0], 31);
-    await idleFor(roomId, players[2], 20);
+    await idleFor(roomId, players[0], 91);
+    await idleFor(roomId, players[2], 80);
     await sweep();
     const s = await snapshot(players[1], roomId);
     expect(s.room.host_id).toBe(players[1]);
@@ -108,7 +108,7 @@ describe("lobby idle removal", () => {
     const autostartAt = async () =>
       (await db.query<{ at: string | null }>("select autostart_at::text as at from public.rooms where id = $1", [roomId])).rows[0].at;
     expect(await autostartAt()).not.toBeNull();
-    await idleFor(roomId, players[1], 31);
+    await idleFor(roomId, players[1], 91);
     await sweep();
     expect((await snapshot(players[0], roomId)).players.find((p) => p.user_id === players[1])!.left_at).not.toBeNull();
     expect(await autostartAt()).toBeNull();
@@ -119,7 +119,7 @@ describe("lobby idle removal", () => {
     await rpc(db, players[0], "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, players[1], "set_ready", { p_room_id: roomId, p_ready: true });
     await rpc(db, players[0], "start_game", { p_room_id: roomId });
-    await idleFor(roomId, players[1], 45);
+    await idleFor(roomId, players[1], 600);
     await sweep();
     const s = await snapshot(players[0], roomId);
     expect(s.room.status).toBe("producing");

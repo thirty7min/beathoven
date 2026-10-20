@@ -36,6 +36,7 @@ export type RoomPlayer = {
   joined_at: string;
   left_at: string | null;
   last_seen_at?: string;
+  leave_pending_at?: string | null;
   is_ready: boolean;
   is_bot?: boolean;
   role?: RoomRole;

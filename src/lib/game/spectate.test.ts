@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeSpectators, isSpectating, myRole, roomAction, spectatorLabel, wasPromoted } from "./spectate";
+import { activeSpectators, canReclaimSeat, isSpectating, myRole, roomAction, spectatorLabel, wasPromoted } from "./spectate";
 import type { RoomPlayer, RoomSnapshot, RoomStatus } from "./types";
 
 const member = (user_id: string, over: Partial<RoomPlayer> = {}): RoomPlayer => ({
@@ -51,5 +51,22 @@ describe("roomAction", () => {
 
   it("labels the audience", () => {
     expect(spectatorLabel(3)).toBe("3 watching");
+  });
+});
+
+describe("canReclaimSeat", () => {
+  const room = (status: RoomStatus) => ({ status, phase_started_at: "2026-10-20T00:00:00Z" });
+  const at = (players: RoomPlayer[], status: RoomStatus = "producing") =>
+    ({ me: "me", players, room: room(status) }) as unknown as RoomSnapshot;
+
+  it("is true for a player who left during the current upload phase", () => {
+    expect(canReclaimSeat(at([member("me", { left_at: "2026-10-20T00:01:00Z" })]))).toBe(true);
+  });
+
+  it("is false after the upload phase, for spectators, for earlier leavers and for active members", () => {
+    expect(canReclaimSeat(at([member("me", { left_at: "2026-10-20T00:01:00Z" })], "listening"))).toBe(false);
+    expect(canReclaimSeat(at([member("me", { role: "spectator", left_at: "2026-10-20T00:01:00Z" })]))).toBe(false);
+    expect(canReclaimSeat(at([member("me", { left_at: "2026-10-19T23:59:00Z" })]))).toBe(false);
+    expect(canReclaimSeat(at([member("me")]))).toBe(false);
   });
 });

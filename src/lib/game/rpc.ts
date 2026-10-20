@@ -157,6 +157,10 @@ export async function kickPlayer(supabase: TypedSupabaseClient, roomId: string, 
   unwrap(await supabase.rpc("kick_player", { p_room_id: roomId, p_user_id: userId }));
 }
 
+export async function transferHost(supabase: TypedSupabaseClient, roomId: string, userId: string) {
+  unwrap(await supabase.rpc("transfer_host", { p_room_id: roomId, p_user_id: userId }));
+}
+
 export async function voteKick(supabase: TypedSupabaseClient, roomId: string, targetId: string) {
   return unwrap<KickResult>(await supabase.rpc("vote_kick", { p_room_id: roomId, p_target: targetId }));
 }
@@ -165,8 +169,14 @@ export async function touchRoom(supabase: TypedSupabaseClient, roomId: string) {
   unwrap(await supabase.rpc("touch_room", { p_room_id: roomId }));
 }
 
-export async function roomHeartbeat(supabase: TypedSupabaseClient) {
-  return unwrap<ActiveRoom | null>(await supabase.rpc("room_heartbeat"));
+export async function roomHeartbeat(supabase: TypedSupabaseClient, tabId?: string) {
+  return unwrap<ActiveRoom | null>(await supabase.rpc("room_heartbeat", { p_tab_id: tabId }));
+}
+
+export type ReapResult = { removed: boolean; retry_in_ms: number | null };
+
+export async function reapMember(supabase: TypedSupabaseClient, roomId: string, userId: string) {
+  return unwrap<ReapResult>(await supabase.rpc("reap_member", { p_room_id: roomId, p_user_id: userId }));
 }
 
 export type UploadKind = "submission" | "avatar";

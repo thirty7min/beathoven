@@ -252,6 +252,7 @@ describe("becoming a player", () => {
   it("promotes spectators in join order up to capacity when the room returns to the lobby", async () => {
     const { players, roomId, code } = await producing(2, { p_max_players: 3 });
     const [first, second, third] = await watchers(code, 3);
+    await rpc(db, players[1], "room_heartbeat");
     await backToLobby(roomId, players[0]);
 
     let s = await snapshot(players[0], roomId);
@@ -289,6 +290,8 @@ describe("member list", () => {
     const [fan] = await watchers(code, 1);
     await submitVerified(db, players[2], roomId);
     await rpc(db, players[2], "leave_room", { p_room_id: roomId });
+    await expirePhase(roomId);
+    await rpc(db, players[0], "advance_room", { p_room_id: roomId });
     expect((await join(players[2], code)).role).toBe("spectator");
     await rpc(db, players[2], "leave_room", { p_room_id: roomId });
     await rpc(db, fan, "leave_room", { p_room_id: roomId });
@@ -303,9 +306,9 @@ describe("idle spectators", () => {
   it("are removed after the grace in any phase while idle players stay mid-game", async () => {
     const { players, roomId, code } = await producing(2);
     const [fan, keen] = await watchers(code, 2);
-    await idleFor(roomId, fan, 31);
-    await idleFor(roomId, keen, 25);
-    await idleFor(roomId, players[1], 45);
+    await idleFor(roomId, fan, 91);
+    await idleFor(roomId, keen, 85);
+    await idleFor(roomId, players[1], 600);
     await db.query("select public.sweep_rooms()");
     const s = await snapshot(players[0], roomId);
     expect(roleOf(s, fan)).toBeNull();

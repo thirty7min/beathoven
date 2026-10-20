@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isRemovedError, isSystemMessage, kickActionFor, kickVoteFor, removalMessage, votedToKick, wasRemoved } from "./kick";
+import { isRemovedError, isSystemMessage, kickActionFor, kickVoteFor, removalDestination, removalMessage, votedToKick, wasRemoved } from "./kick";
 import type { ChatMessage, RoomPlayer, RoomSnapshot } from "./types";
 
 const snapshot = {
@@ -31,8 +31,13 @@ describe("kick helpers", () => {
   it("tells a kick apart from an idle removal", () => {
     expect(removalMessage(true, "spectator")).toBe("You were removed from the room");
     expect(removalMessage(false, "spectator")).toBe("You stopped watching after being inactive");
-    expect(removalMessage(false, "player")).toBe("You left the room after being inactive");
-    expect(removalMessage(false, null)).toBe("You left the room after being inactive");
+    expect(removalMessage(false, "player")).toBe("You were removed from the room for inactivity");
+    expect(removalMessage(false, null)).toBe("You were removed from the room for inactivity");
+  });
+
+  it("sends kicked players to Play and inactive ones home", () => {
+    expect(removalDestination(true)).toBe("/play");
+    expect(removalDestination(false)).toBe("/");
   });
 
   it("recognizes removal errors", () => {
